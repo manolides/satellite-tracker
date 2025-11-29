@@ -1,0 +1,44 @@
+body,
+html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+#map {
+    height: 100%;
+    width: 100%;
+}
+
+#branding {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    bottom: auto;
+    right: auto;
+    color: white;
+    font-size: 20px;
+    z-index: 1000;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+    /* Let clicks pass through to map */
+    letter-spacing: 1px;
+}
+
+#controls {
+    position: absolute;
+    bottom: 30px;
+    left: 10px;
+    background: white;
+    padding: 10px;
+    border-radius: 5px;
+    font-family: Arial, sans-serif;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+}
+
+/* Make NASA Snow Cover tiles white */
+img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
+    filter: grayscale(100%) brightness(400%);
+}
