@@ -64,8 +64,9 @@ function initMap() {
         clickable: false
     });
 
+    const toggleSolarEl = document.getElementById('toggleSolar');
     solarAngleLayer = new google.maps.Polygon({
-        map: document.getElementById('toggleSolar').checked ? map : null,
+        map: (toggleSolarEl && toggleSolarEl.checked) ? map : null,
         fillColor: '#FF0000', // Red for exclusion zone
         fillOpacity: 0.25,
         strokeWeight: 0,
@@ -125,44 +126,68 @@ function initMap() {
         }
     }
 
+
+
+
+
     // Toggle Snow Cover
-    document.getElementById('toggleSnow').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.overlayMapTypes.push(snowCoverLayer);
-        } else {
-            map.overlayMapTypes.forEach((layer, index) => {
-                if (layer === snowCoverLayer) {
-                    map.overlayMapTypes.removeAt(index);
-                }
-            });
-        }
-        updateAttribution();
-    });
+    const toggleSnow = document.getElementById('toggleSnow');
+    if (toggleSnow) {
+        toggleSnow.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                map.overlayMapTypes.push(snowCoverLayer);
+            } else {
+                map.overlayMapTypes.forEach((layer, index) => {
+                    if (layer === snowCoverLayer) {
+                        map.overlayMapTypes.removeAt(index);
+                    }
+                });
+            }
+            updateAttribution();
+        });
+    }
 
     // Toggle Cloud Cover
-    document.getElementById('toggleCloud').addEventListener('change', (e) => {
-        if (e.target.checked) {
-            map.overlayMapTypes.push(cloudCoverLayer);
-        } else {
-            map.overlayMapTypes.forEach((layer, index) => {
-                if (layer === cloudCoverLayer) {
-                    map.overlayMapTypes.removeAt(index);
-                }
-            });
-        }
-        updateAttribution();
-    });
+    const toggleCloud = document.getElementById('toggleCloud');
+    if (toggleCloud) {
+        toggleCloud.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                map.overlayMapTypes.push(cloudCoverLayer);
+            } else {
+                map.overlayMapTypes.forEach((layer, index) => {
+                    if (layer === cloudCoverLayer) {
+                        map.overlayMapTypes.removeAt(index);
+                    }
+                });
+            }
+            updateAttribution();
+        });
+    }
 
-    document.getElementById('toggleSolar').addEventListener('change', function () {
-        console.log('Toggle clicked. Checked:', this.checked);
-        if (this.checked) {
-            solarAngleLayer.setMap(map);
-            console.log('Layer set to map');
-        } else {
-            solarAngleLayer.setMap(null);
-            console.log('Layer removed from map');
-        }
-    });
+    const toggleSolar = document.getElementById('toggleSolar');
+    if (toggleSolar) {
+        toggleSolar.addEventListener('change', function () {
+            console.log('Toggle clicked. Checked:', this.checked);
+            if (this.checked) {
+                solarAngleLayer.setMap(map);
+                console.log('Layer set to map');
+            } else {
+                solarAngleLayer.setMap(null);
+                console.log('Layer removed from map');
+            }
+
+            // Toggle Legend Visibility
+            const sunLegend = document.getElementById('sun-legend');
+            if (sunLegend) {
+                sunLegend.style.display = this.checked ? 'block' : 'none';
+            }
+
+            // Also toggle the marginal layer if it exists
+            if (window.marginalSolarLayer) {
+                window.marginalSolarLayer.setVisible(this.checked);
+            }
+        });
+    }
 
     fetchTLEs();
 }
@@ -401,8 +426,8 @@ function updateNightLayer(date) {
  * Updates the Solar Angle Layer (Red/Yellow zones).
  * 
  * This visualizes areas where the sun elevation is too low for good imaging.
- * - Red Zone: Sun elevation is < 30° even at solar noon (impossible to image today).
- * - Yellow Zone: Sun elevation is < 30° at 10:30 AM (standard pass time) but improves later.
+ * - Red Zone: Sun elevation is < 30° even at solar noon (Always below 30°).
+ * - Yellow Zone: Sun elevation is < 30° at 10:30 AM but improves later (Sometimes above 30°).
  * 
  * @param {Date} date - Current date/time
  */
@@ -512,7 +537,8 @@ function updateSolarAngleLayer(date) {
     window.marginalSolarLayer.setPaths(yellowPaths);
 
     // Ensure visibility matches toggle
-    const isVisible = document.getElementById('toggleSolar').checked;
+    const toggleSolar = document.getElementById('toggleSolar');
+    const isVisible = toggleSolar ? toggleSolar.checked : false;
     window.marginalSolarLayer.setVisible(isVisible);
 }
 
@@ -624,19 +650,46 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Prediction panel NOT FOUND in DOM!");
     }
 
-    // Max Off-Nadir Input is now static HTML
+    // Max Off-Nadir Input Logic
     const maxOffNadirInput = document.getElementById('maxOffNadir');
     if (maxOffNadirInput) {
-        // Optional: Add validation listener
-        maxOffNadirInput.addEventListener('change', (e) => {
+        // Strict input validation for mobile/desktop
+        maxOffNadirInput.addEventListener('input', (e) => {
+            // Remove any non-digit characters
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+
+            // Validate range
             let val = parseInt(e.target.value);
-            if (val < 1) e.target.value = 1;
-            if (val > 90) e.target.value = 90; // Allow up to 90 technically, though 50 is reasonable limit
+            if (val > 90) e.target.value = 90;
+            // Don't enforce min=1 strictly on input to allow typing, but maybe on blur
         });
+
+        maxOffNadirInput.addEventListener('blur', (e) => {
+            let val = parseInt(e.target.value);
+            if (isNaN(val) || val < 1) e.target.value = 1;
+        });
+
         // Add Enter key support
         maxOffNadirInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 handlePrediction();
+            }
+        });
+    }
+
+    // Minimize Button Logic
+    const minimizeBtn = document.getElementById('minimizeBtn');
+    const panelBody = document.getElementById('panel-body');
+    if (minimizeBtn && panelBody) {
+        minimizeBtn.addEventListener('click', () => {
+            if (panelBody.style.display === 'none') {
+                panelBody.style.display = 'flex'; // Use flex to maintain layout
+                minimizeBtn.textContent = '_';
+                minimizeBtn.title = "Minimize";
+            } else {
+                panelBody.style.display = 'none';
+                minimizeBtn.textContent = '□'; // Square or maximize icon
+                minimizeBtn.title = "Maximize";
             }
         });
     }
@@ -684,7 +737,10 @@ async function handlePrediction() {
         window.lastObserverCoords = coords;
 
         // Add a marker for the observer
-        new google.maps.Marker({
+        if (window.observerMarker) {
+            window.observerMarker.setMap(null);
+        }
+        window.observerMarker = new google.maps.Marker({
             map: map,
             position: coords,
             title: "Observer",

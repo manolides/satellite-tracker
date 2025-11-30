@@ -20,35 +20,60 @@
     </div>
 
     <div id="prediction-panel">
-        <h3>Pass Prediction</h3>
-        <div class="input-group">
-            <input type="text" id="locationInput" placeholder="Enter City or Address">
-            <label for="maxOffNadir" style="color: #aaa; font-size: 12px; align-self: center;">Max Off-Nadir:</label>
-            <input type="number" id="maxOffNadir" value="30" min="1" max="50" style="width: 50px;">
-            <button id="predictBtn">Predict</button>
+        <div class="panel-header">
+            <h3>Pass Prediction</h3>
+            <button id="minimizeBtn" title="Minimize">_</button>
         </div>
-        <div id="prediction-results">
-            <table id="resultsTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Time</th>
-                        <th>Satellite</th>
-                        <th>Max Off-Nadir</th>
-                        <th>Sun Elevation</th>
-                        <th>Cloud Cover</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Results will be injected here -->
-                </tbody>
-            </table>
-            <div id="loading-spinner" style="display: none;">Calculating...</div>
-            <div id="no-results" style="display: none;">No suitable passes found in next 1 year.</div>
-            <div id="reliability-warning"
-                style="display: none; color: #ffc107; font-size: 12px; margin-top: 10px; border-top: 1px solid #444; padding-top: 5px;">
-                ⚠️ Predictions > 14 days out are rough estimates.
+        <div id="panel-body">
+            <div class="input-group">
+                <input type="text" id="locationInput" placeholder="Enter City or Address">
+                <label for="maxOffNadir" style="color: #aaa; font-size: 12px; align-self: center;">Max
+                    Off-Nadir:</label>
+                <input type="number" id="maxOffNadir" value="30" min="1" max="50" style="width: 50px;"
+                    inputmode="numeric" pattern="[0-9]*">
+                <button id="predictBtn">Predict</button>
             </div>
+            <div id="prediction-results">
+                <table id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Sat</th>
+                            <th>Off-Nadir</th>
+                            <th>Sun El</th>
+                            <th>Cloud Cover</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Results will appear here -->
+                    </tbody>
+                </table>
+                <div id="no-results" style="display:none; text-align: center; padding: 20px; color: #aaa;">
+                    No passes found in the next 365 days matching your criteria.
+                </div>
+                <div id="loading-spinner" style="display:none; text-align: center; padding: 20px;">
+                    <div class="spinner"></div>
+                </div>
+                <div id="reliability-warning"
+                    style="display:none; text-align: center; padding: 10px; color: #ff9800; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    ⚠️ Predictions > 14 days out are rough estimates.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="legends-container">
+        <div id="map-legend">
+            <h4>Off-Nadir View Angle</h4>
+            <div class="legend-item"><span class="circle-icon green"></span> Excellent (&le; 10&deg;)</div>
+            <div class="legend-item"><span class="circle-icon yellow"></span> Good (&le; 20&deg;)</div>
+            <div class="legend-item"><span class="circle-icon red"></span> Fair (&le; 30&deg;)</div>
+        </div>
+        <div id="sun-legend" style="display: none;">
+            <h4>Poor Sun Angle</h4>
+            <div class="legend-item"><span class="square-icon red"></span> Always below 30&deg;</div>
+            <div class="legend-item"><span class="square-icon yellow"></span> Sometimes above 30&deg;</div>
         </div>
     </div>
 
