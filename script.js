@@ -338,12 +338,9 @@ function calculateFootprintRadius(altitudeKm, offNadirDeg) {
     // This is valid if alpha + beta < 90 degrees (horizon).
 
     const sinAlpha = Math.sin(alpha);
-    const term = ((R_EARTH + altitudeKm) / R_EARTH) * sinAlpha;
+    let term = ((R_EARTH + altitudeKm) / R_EARTH) * sinAlpha;
 
-    if (term > 1) {
-        // Horizon case or invalid
-        return 0;
-    }
+    if (term > 1) term = 1; // Clamp to handle floating point noise at horizon
 
     // Angle at the surface (incidence angle + 90?)
     // Let's use the property: alpha + beta + (180 - eta) = 180 => beta = eta - alpha
@@ -972,7 +969,7 @@ async function fetchWeather(lat, lng, date) {
         let minDiff = Infinity;
 
         data.hourly.time.forEach((t, i) => {
-            const time = new Date(t).getTime(); // OpenMeteo returns ISO strings
+            const time = new Date(t + 'Z').getTime(); // OpenMeteo returns ISO strings, treat as UTC
             const diff = Math.abs(time - targetTime);
             if (diff < minDiff) {
                 minDiff = diff;
