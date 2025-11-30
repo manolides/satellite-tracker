@@ -1031,7 +1031,7 @@ async function displayResults(passes) {
         // Sun Warning
         let sunWarning = '';
         if (pass.sunElevationAtMax < 30) {
-            sunWarning = '<span class="warning-icon" title="Poor Sun Angle (< 30°)">⚠️</span>';
+            sunWarning = '<span class="warning-icon" title="Poor Sun Angle (< 30°)" onclick="alert(\'Shadows will be too long\')">⚠️</span>';
         }
 
         row.innerHTML = `
