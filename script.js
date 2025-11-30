@@ -733,6 +733,10 @@ async function handlePrediction() {
         // Store coords for weather fetching
         window.lastObserverCoords = coords;
 
+        // Fetch Timezone
+        window.lastObserverTimeZone = await fetchTimeZone(coords.lat(), coords.lng());
+        console.log("Target Timezone:", window.lastObserverTimeZone);
+
         // Add a marker for the observer
         if (window.observerMarker) {
             window.observerMarker.setMap(null);
@@ -984,6 +988,18 @@ async function fetchWeather(lat, lng, date) {
     }
 }
 
+async function fetchTimeZone(lat, lng) {
+    try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true&timezone=auto`;
+        const response = await fetch(url);
+        const data = await response.json();
+        return data.timezone;
+    } catch (e) {
+        console.error("Timezone fetch failed:", e);
+        return undefined; // Fallback to browser local
+    }
+}
+
 async function displayResults(passes) {
     const tbody = document.querySelector('#resultsTable tbody');
     const noResults = document.getElementById('no-results');
@@ -1020,8 +1036,12 @@ async function displayResults(passes) {
         }
 
         // Date/Time
-        const dateStr = pass.startTime.toLocaleDateString();
-        const timeStr = pass.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateOptions = { timeZone: window.lastObserverTimeZone };
+        const timeOptions = { hour: '2-digit', minute: '2-digit', timeZone: window.lastObserverTimeZone };
+
+        const dateStr = pass.startTime.toLocaleDateString([], dateOptions);
+        const timeStr = pass.startTime.toLocaleTimeString([], timeOptions);
+        const timeZoneAbbr = window.lastObserverTimeZone || 'Local';
 
         // Quality Class
         let qualityClass = 'quality-red';
@@ -1036,7 +1056,7 @@ async function displayResults(passes) {
 
         row.innerHTML = `
             <td>${dateStr}</td>
-            <td>${timeStr}</td>
+            <td>${timeStr} (${timeZoneAbbr})</td>
             <td>${pass.satName}</td>
             <td class="${qualityClass}">${pass.minOffNadir.toFixed(1)}°</td>
             <td>${pass.sunElevationAtMax.toFixed(0)}° ${sunWarning}</td>
