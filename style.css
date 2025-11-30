@@ -49,7 +49,7 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     position: absolute;
     top: 60px;
     right: 20px;
-    width: 320px;
+    width: 400px;
     background: rgba(20, 20, 20, 0.95);
     color: white;
     padding: 15px;

@@ -1041,7 +1041,12 @@ async function displayResults(passes) {
 
         const dateStr = pass.startTime.toLocaleDateString([], dateOptions);
         const timeStr = pass.startTime.toLocaleTimeString([], timeOptions);
-        const timeZoneAbbr = window.lastObserverTimeZone || 'Local';
+        let timeZoneDisplay = 'Local';
+        if (window.lastObserverTimeZone) {
+            // Extract city: "America/Los_Angeles" -> "Los Angeles"
+            const parts = window.lastObserverTimeZone.split('/');
+            timeZoneDisplay = parts[parts.length - 1].replace(/_/g, ' ');
+        }
 
         // Quality Class
         let qualityClass = 'quality-red';
@@ -1056,7 +1061,7 @@ async function displayResults(passes) {
 
         row.innerHTML = `
             <td>${dateStr}</td>
-            <td>${timeStr} (${timeZoneAbbr})</td>
+            <td>${timeStr}<br><span style="font-size: 10px; color: #aaa;">${timeZoneDisplay}</span></td>
             <td>${pass.satName}</td>
             <td class="${qualityClass}">${pass.minOffNadir.toFixed(1)}°</td>
             <td>${pass.sunElevationAtMax.toFixed(0)}° ${sunWarning}</td>
