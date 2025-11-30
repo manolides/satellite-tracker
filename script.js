@@ -1,3 +1,18 @@
+/**
+ * Satellite Tracker Logic
+ * 
+ * This script handles the core functionality of the satellite tracker application, including:
+ * 1. Initializing the Google Map and its layers (Night, Solar, Snow, Cloud).
+ * 2. Fetching and parsing TLE (Two-Line Element) data for satellites.
+ * 3. Propagating satellite orbits using satellite.js.
+ * 4. Predicting future passes based on user location and constraints.
+ * 5. integrating weather forecasts from Open-Meteo.
+ * 
+ * Dependencies:
+ * - Google Maps JavaScript API
+ * - satellite.js (for orbit propagation)
+ */
+
 let map;
 let nightLayer;
 let solarAngleLayer;
@@ -21,6 +36,10 @@ const SATELLITE_SVG = {
     labelOrigin: { x: 0, y: -20 } // Move label above the icon
 };
 
+/**
+ * Initializes the Google Map and sets up all overlay layers.
+ * Called by the Google Maps API callback.
+ */
 function initMap() {
     map = new google.maps.Map(document.getElementById("map"), {
         center: { lat: 0, lng: 0 },
@@ -148,6 +167,12 @@ function initMap() {
     fetchTLEs();
 }
 
+/**
+ * Fetches TLE data from the local 'satellites.json' file.
+ * This file is updated automatically by a GitHub Action.
+ * 
+ * It parses the TLEs and initializes the satellite objects for propagation.
+ */
 async function fetchTLEs() {
     console.log("Fetching TLEs from local file...");
 
@@ -236,6 +261,13 @@ function createVisuals(sat) {
     }
 }
 
+/**
+ * Calculates the satellite's position (Lat/Lng) at a specific time.
+ * 
+ * @param {Object} satrec - The satellite record object from satellite.js
+ * @param {Date} date - The time to calculate position for
+ * @returns {Object|null} {lat, lng} or null if calculation fails
+ */
 function getLatLngAtTime(satrec, date) {
     const positionAndVelocity = satellite.propagate(satrec, date);
     const positionEci = positionAndVelocity.position;
@@ -251,6 +283,17 @@ function getLatLngAtTime(satrec, date) {
     return { lat: latitude, lng: longitude };
 }
 
+/**
+ * Calculates the radius of the satellite's footprint on the ground based on the
+ * maximum off-nadir angle.
+ * 
+ * Uses spherical geometry to determine the surface distance from the sub-satellite point
+ * to the edge of the visible cone.
+ * 
+ * @param {number} altitudeKm - Satellite altitude in kilometers
+ * @param {number} offNadirDeg - The off-nadir angle in degrees
+ * @returns {number} Radius in meters
+ */
 function calculateFootprintRadius(altitudeKm, offNadirDeg) {
     const R_EARTH = 6371; // Earth radius in km
     const alpha = offNadirDeg * (Math.PI / 180); // Off-nadir angle in radians
@@ -288,6 +331,11 @@ function calculateFootprintRadius(altitudeKm, offNadirDeg) {
     return distanceKm * 1000; // Convert to meters
 }
 
+/**
+ * Main animation loop. Updates the position of all satellites, markers, cones,
+ * and the day/night terminator.
+ * Called every second.
+ */
 function updatePositions() {
     const now = new Date();
 
@@ -349,6 +397,15 @@ function updateNightLayer(date) {
     nightLayer.setPath(path);
 }
 
+/**
+ * Updates the Solar Angle Layer (Red/Yellow zones).
+ * 
+ * This visualizes areas where the sun elevation is too low for good imaging.
+ * - Red Zone: Sun elevation is < 30° even at solar noon (impossible to image today).
+ * - Yellow Zone: Sun elevation is < 30° at 10:30 AM (standard pass time) but improves later.
+ * 
+ * @param {Date} date - Current date/time
+ */
 function updateSolarAngleLayer(date) {
     const sunPos = getSunPosition(date);
     const declination = sunPos.lat; // getSunPosition returns lat as declination
@@ -470,6 +527,13 @@ function createBoxPath(latMin, latMax) {
     ];
 }
 
+/**
+ * Calculates the Sun's position (Declination and Right Ascension/Longitude) for a given date.
+ * Uses low-precision formulas suitable for this visualization (accuracy ~0.01 deg).
+ * 
+ * @param {Date} date 
+ * @returns {Object} {lat: declination, lng: sub-solar longitude}
+ */
 function getSunPosition(date) {
     const rad = Math.PI / 180;
     const deg = 180 / Math.PI;
@@ -594,6 +658,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+/**
+ * Handles the "Predict" button click.
+ * Geocodes the user's location and initiates the pass prediction process.
+ */
 async function handlePrediction() {
     const locationInput = document.getElementById('locationInput').value;
     const maxOffNadirInput = document.getElementById('maxOffNadir');
@@ -611,6 +679,9 @@ async function handlePrediction() {
             showLoading(false);
             return;
         }
+
+        // Store coords for weather fetching
+        window.lastObserverCoords = coords;
 
         // Add a marker for the observer
         new google.maps.Marker({
@@ -684,6 +755,23 @@ function geocodeAddress(address) {
     });
 }
 
+/**
+ * Core Pass Prediction Algorithm.
+ * 
+ * Finds future passes where the satellite is visible, illuminated by the sun,
+ * and within the specified off-nadir angle.
+ * 
+ * Strategy:
+ * 1. Coarse Scan: Step through time in 1-minute intervals to find "windows" of visibility.
+ * 2. Fine Search: Once a window is found, search within it (5-second steps) to find the moment of closest approach (min off-nadir).
+ * 
+ * @param {Object} sat - Satellite object
+ * @param {Object} observerCoords - Google Maps LatLng object for observer
+ * @param {number} maxOffNadir - Maximum allowed off-nadir angle
+ * @param {number} limit - Max number of passes to return
+ * @param {number} maxDays - How many days into the future to search
+ * @returns {Array} List of pass objects
+ */
 function predictPasses(sat, observerCoords, maxOffNadir = 30, limit = 5, maxDays = 365) {
     const passes = [];
     const stepSeconds = 60; // Coarse step
@@ -793,13 +881,57 @@ function findBestPassDetails(sat, observerCoords, startMs, endMs, maxOffNadir) {
     // Filter
     if (bestDetails) {
         const isDaylight = bestDetails.sunElevationAtMax > 0;
-        const isGoodAngle = bestDetails.minOffNadir <= maxOffNadir;
-        if (isDaylight && isGoodAngle) return bestDetails;
+        if (isDaylight && bestDetails.minOffNadir <= maxOffNadir) return bestDetails;
     }
     return null;
 }
 
-function displayResults(passes) {
+/**
+ * Fetches cloud cover forecast from Open-Meteo API.
+ * 
+ * @param {number} lat - Latitude
+ * @param {number} lng - Longitude
+ * @param {Date} date - Date/Time of the pass
+ * @returns {number|null} Cloud cover percentage (0-100) or null if unavailable
+ */
+async function fetchWeather(lat, lng, date) {
+    // OpenMeteo goes out ~16 days.
+    const now = new Date();
+    const diffDays = (date - now) / (1000 * 60 * 60 * 24);
+
+    if (diffDays > 14 || diffDays < 0) return null;
+
+    try {
+        const dateStr = date.toISOString().split('T')[0];
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=cloud_cover&start_date=${dateStr}&end_date=${dateStr}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!data.hourly) return null;
+
+        // Find closest hour
+        const targetTime = date.getTime();
+        let closestIdx = 0;
+        let minDiff = Infinity;
+
+        data.hourly.time.forEach((t, i) => {
+            const time = new Date(t).getTime(); // OpenMeteo returns ISO strings
+            const diff = Math.abs(time - targetTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestIdx = i;
+            }
+        });
+
+        return data.hourly.cloud_cover[closestIdx];
+    } catch (e) {
+        console.error("Weather fetch failed:", e);
+        return null;
+    }
+}
+
+async function displayResults(passes) {
     const tbody = document.querySelector('#resultsTable tbody');
     const noResults = document.getElementById('no-results');
     const reliabilityWarning = document.getElementById('reliability-warning');
@@ -818,12 +950,20 @@ function displayResults(passes) {
     const now = new Date();
     const fourteenDays = 14 * 24 * 60 * 60 * 1000;
 
-    passes.forEach(pass => {
+    // Process passes sequentially to fetch weather (could be parallelized but rate limits)
+    for (const pass of passes) {
         const row = document.createElement('tr');
 
         // Check if > 14 days
         if (pass.startTime.getTime() - now.getTime() > fourteenDays) {
             hasLongTerm = true;
+        }
+
+        // Fetch Weather
+        let cloudCover = await fetchWeather(window.lastObserverCoords.lat(), window.lastObserverCoords.lng(), pass.startTime);
+        let cloudText = 'N/A';
+        if (cloudCover !== null) {
+            cloudText = `${cloudCover}%`;
         }
 
         // Date/Time
@@ -847,10 +987,11 @@ function displayResults(passes) {
             <td>${pass.satName}</td>
             <td class="${qualityClass}">${pass.minOffNadir.toFixed(1)}°</td>
             <td>${pass.sunElevationAtMax.toFixed(0)}° ${sunWarning}</td>
+            <td>${cloudText}</td>
         `;
 
         tbody.appendChild(row);
-    });
+    }
 
     if (reliabilityWarning) {
         reliabilityWarning.style.display = hasLongTerm ? 'block' : 'none';

@@ -7,9 +7,27 @@ SATELLITE_IDS = ["48268", "49070"]
 BASE_URL = "https://celestrak.org/NORAD/elements/gp.php"
 OUTPUT_FILE = "satellites.json"
 
+"""
+Satellite Data Fetcher
+
+This script is responsible for keeping the satellite orbital data (TLEs) up to date.
+It runs as part of a GitHub Action workflow (or manually) to:
+1. Connect to CelesTrak's API.
+2. Download the latest Two-Line Elements (TLE) for specific satellites.
+3. Parse the raw text format into a structured JSON object.
+4. Save the result to 'satellites.json' for the frontend to consume.
+
+This "Backend-for-Frontend" approach avoids CORS issues and API rate limits
+by serving static JSON files to the client.
+"""
+
 import ssl
 
 def fetch_tles():
+    """
+    Fetches TLE data for configured satellites and saves to JSON.
+    Includes SSL context bypass to handle potential certificate issues in some environments.
+    """
     all_satellites = []
     
     # Create an unverified SSL context
