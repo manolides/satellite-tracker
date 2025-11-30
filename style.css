@@ -284,3 +284,27 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     background-color: rgba(255, 165, 0, 0.2);
     border-color: #FFA500;
 }
+
+/* Attributions Footer */
+#attributions {
+    position: absolute;
+    top: 50px;
+    left: 20px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.7);
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 5px;
+    border-radius: 3px;
+    pointer-events: auto;
+}
+
+#attributions a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+}
+
+#attributions a:hover {
+    text-decoration: underline;
+    color: white;
+}
