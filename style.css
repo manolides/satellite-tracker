@@ -18,7 +18,9 @@ html {
     bottom: auto;
     right: auto;
     color: white;
-    font-size: 20px;
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     z-index: 1000;
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
     pointer-events: none;
@@ -307,4 +309,198 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
 #attributions a:hover {
     text-decoration: underline;
     color: white;
+}
+
+/* --- WOPR / WarGames Mode --- */
+
+body.wopr-mode {
+    background-color: #000;
+    color: #00ffff;
+    font-family: 'VT323', monospace;
+    text-shadow: 0 0 4px #00ffff;
+}
+
+/* CRT Overlay */
+body.wopr-mode #crt-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg,
+            rgba(255, 0, 0, 0.06),
+            rgba(0, 255, 0, 0.02),
+            rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+    z-index: 9999;
+    animation: flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+    0% {
+        opacity: 0.97;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.98;
+    }
+}
+
+/* UI Elements in WOPR Mode */
+body.wopr-mode #branding {
+    color: #00ffff;
+    font-family: 'VT323', monospace;
+    font-size: 32px;
+    text-shadow: 0 0 8px #00ffff;
+    letter-spacing: 2px;
+}
+
+body.wopr-mode #controls,
+body.wopr-mode #prediction-panel,
+body.wopr-mode #map-legend,
+body.wopr-mode #sun-legend {
+    background: rgba(0, 20, 20, 0.9);
+    border: 2px solid #00ffff;
+    border-radius: 0;
+    box-shadow: 0 0 10px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.2);
+    color: #00ffff;
+    font-family: 'VT323', monospace;
+}
+
+body.wopr-mode h3,
+body.wopr-mode h4,
+body.wopr-mode label,
+body.wopr-mode input,
+body.wopr-mode button {
+    font-family: 'VT323', monospace;
+    color: #00ffff;
+    text-shadow: 0 0 2px #00ffff;
+}
+
+body.wopr-mode input[type="text"],
+body.wopr-mode input[type="number"] {
+    background: #000;
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    border-radius: 0;
+}
+
+body.wopr-mode button {
+    background: #000;
+    border: 1px solid #00ffff;
+    color: #00ffff;
+    text-transform: uppercase;
+    border-radius: 0;
+}
+
+body.wopr-mode button:hover {
+    background: #00ffff;
+    color: #000;
+    box-shadow: 0 0 15px #00ffff;
+}
+
+/* Hide modern attributions or style them */
+body.wopr-mode #attributions {
+    background: transparent;
+    color: #00ffff;
+    font-family: 'VT323', monospace;
+}
+
+body.wopr-mode
+
+/* De-modernize UI Elements */
+.wopr-mode button,
+.wopr-mode input,
+.wopr-mode .prediction-panel,
+.wopr-mode .controls {
+    border-radius: 0 !important;
+}
+
+.wopr-mode input {
+    background-color: transparent !important;
+    border: 1px solid #00ffff !important;
+    color: #00ffff !important;
+    font-family: 'VT323', monospace !important;
+    box-shadow: none !important;
+}
+
+.wopr-mode button {
+    background-color: #000000 !important;
+    border: 1px solid #00ffff !important;
+    color: #00ffff !important;
+    font-family: 'VT323', monospace !important;
+    text-transform: uppercase;
+    transition: all 0.1s ease;
+}
+
+.wopr-mode button:hover {
+    background-color: #00ffff !important;
+    color: #000000 !important;
+    box-shadow: 0 0 10px #00ffff;
+    cursor: pointer;
+}
+
+/* Adjust placeholder color */
+.wopr-mode input::placeholder {
+    color: rgba(0, 255, 255, 0.5) !important;
+}
+
+body.wopr-mode .gm-style-cc {
+    display: none;
+    /* Hide Google copyright if possible/allowed, or style it */
+    opacity: 0.5;
+}
+
+/* WOPR Status Display */
+#wopr-status {
+    display: none;
+    /* Hidden by default */
+}
+
+.wopr-mode #wopr-status {
+    display: block;
+    position: fixed;
+    bottom: 25px;
+    /* Aligned with typical Google Maps controls */
+    right: 70px;
+    /* To the left of the zoom controls (approx 40-50px wide) */
+    text-align: right;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+#zulu-clock {
+    font-family: 'VT323', monospace;
+    font-size: 24px;
+    /* Slightly smaller for bottom bar */
+    color: #00ffff;
+    text-shadow: 0 0 5px #00ffff;
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 2px 8px;
+    border: 1px solid #00ffff;
+    display: inline-block;
+}
+
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.3;
+    }
+}
+
+/* Legend Icons */
+body.wopr-mode .circle-icon,
+body.wopr-mode .square-icon {
+    box-shadow: 0 0 5px currentColor;
 }

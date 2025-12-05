@@ -719,6 +719,13 @@ async function handlePrediction() {
 
     if (!locationInput) return;
 
+    // Secret Code Trigger
+    if (locationInput.trim().toUpperCase() === "JOSHUA") {
+        toggleWarGamesMode();
+        document.getElementById('locationInput').value = ""; // Clear input
+        return;
+    }
+
     showLoading(true);
     clearResults();
 
@@ -810,6 +817,362 @@ function geocodeAddress(address) {
             }
         });
     });
+}
+
+// --- WarGames Mode Logic ---
+
+const WARGAMES_MAP_STYLE = [
+    {
+        "featureType": "all",
+        "elementType": "geometry.stroke",
+        "stylers": [{ "visibility": "off" }]
+    },
+    {
+        "featureType": "all",
+        "elementType": "geometry.fill",
+        "stylers": [{ "color": "#000000" }]
+    },
+    {
+        "featureType": "all",
+        "elementType": "labels",
+        "stylers": [{ "visibility": "off" }] // Hide ALL default labels
+    },
+    {
+        "featureType": "administrative.country",
+        "elementType": "geometry.stroke",
+        "stylers": [{ "visibility": "on" }, { "color": "#00ffff" }, { "weight": 2 }]
+    },
+    {
+        "featureType": "administrative.province",
+        "elementType": "geometry.stroke",
+        "stylers": [{ "visibility": "on" }, { "color": "#00ffff" }, { "weight": 1 }]
+    },
+    {
+        "featureType": "landscape",
+        "elementType": "geometry.fill",
+        "stylers": [{ "color": "#000a0a" }] // Very dark cyan to distinguish land from water
+    },
+    {
+        "featureType": "water",
+        "elementType": "geometry.fill",
+        "stylers": [{ "color": "#000000" }]
+    },
+    {
+        "featureType": "poi",
+        "stylers": [{ "visibility": "off" }]
+    },
+    {
+        "featureType": "road",
+        "stylers": [{ "visibility": "off" }]
+    },
+    {
+        "featureType": "transit",
+        "stylers": [{ "visibility": "off" }]
+    }
+];
+
+const COASTLINE_GEOJSON_URL = 'https://raw.githubusercontent.com/martynafford/natural-earth-geojson/master/110m/physical/ne_110m_coastline.json';
+const CITIES_GEOJSON_URL = 'https://raw.githubusercontent.com/martynafford/natural-earth-geojson/master/110m/cultural/ne_110m_populated_places.json';
+
+const STRATEGIC_TARGETS = [
+    // --- BLUE TEAM: UNITED STATES (CONUS) ---
+    { "name": "NORAD (Cheyenne Mtn)", "lat": 38.744, "lng": -104.845, "team": "usa", "type": "command" },
+    { "name": "USSTRATCOM (Offutt)", "lat": 41.118, "lng": -95.912, "team": "usa", "type": "command" },
+    { "name": "Raven Rock (Site R)", "lat": 39.734, "lng": -77.418, "team": "usa", "type": "command" },
+    { "name": "Malmstrom AFB (ICBM)", "lat": 47.505, "lng": -111.183, "team": "usa", "type": "icbm" },
+    { "name": "Minot AFB (ICBM/Bomber)", "lat": 48.415, "lng": -101.358, "team": "usa", "type": "icbm" },
+    { "name": "F.E. Warren AFB (ICBM)", "lat": 41.145, "lng": -104.870, "team": "usa", "type": "icbm" },
+    { "name": "Whiteman AFB (Stealth)", "lat": 38.730, "lng": -93.547, "team": "usa", "type": "air" },
+    { "name": "Naval Base Kitsap", "lat": 47.721, "lng": -122.710, "team": "usa", "type": "sub" },
+    { "name": "Kings Bay Naval Base", "lat": 30.790, "lng": -81.520, "team": "usa", "type": "sub" },
+    { "name": "Naval Station Norfolk", "lat": 36.945, "lng": -76.302, "team": "usa", "type": "sub" },
+    { "name": "Naval Base San Diego", "lat": 32.684, "lng": -117.127, "team": "usa", "type": "sub" },
+    { "name": "Vandenberg SFB (Space)", "lat": 34.742, "lng": -120.572, "team": "usa", "type": "icbm" },
+    { "name": "Fort Greely (Defense)", "lat": 63.962, "lng": -145.727, "team": "usa", "type": "icbm" },
+
+    // --- BLUE TEAM: PACIFIC (Hawaii, Japan, Korea) ---
+    { "name": "Pearl Harbor (Pacific HQ)", "lat": 21.344, "lng": -157.949, "team": "usa", "type": "sub" },
+    { "name": "Andersen AFB (Guam)", "lat": 13.584, "lng": 144.924, "team": "usa", "type": "air" },
+    { "name": "Yokosuka Naval Base", "lat": 35.293, "lng": 139.662, "team": "jpn", "type": "sub" },
+    { "name": "Sasebo Naval Base", "lat": 33.165, "lng": 129.715, "team": "jpn", "type": "sub" },
+    { "name": "Kadena Air Base", "lat": 26.355, "lng": 127.767, "team": "jpn", "type": "air" },
+    { "name": "Misawa Air Base", "lat": 40.702, "lng": 141.367, "team": "jpn", "type": "intel" },
+    { "name": "Osan Air Base", "lat": 37.090, "lng": 127.033, "team": "kor", "type": "air" },
+    { "name": "Kunsan Air Base", "lat": 35.904, "lng": 126.613, "team": "kor", "type": "air" },
+    { "name": "Camp Humphreys (HQ)", "lat": 36.967, "lng": 127.023, "team": "kor", "type": "command" },
+
+    // --- BLUE TEAM: NATO & EUROPE ---
+    { "name": "Northwood HQ", "lat": 51.629, "lng": -0.417, "team": "nato", "type": "command" },
+    { "name": "NATO HQ (Brussels)", "lat": 50.879, "lng": 4.426, "team": "nato", "type": "command" },
+    { "name": "HMNB Clyde (Faslane)", "lat": 56.069, "lng": -4.814, "team": "nato", "type": "sub" },
+    { "name": "Île Longue (French SSBN)", "lat": 48.306, "lng": -4.506, "team": "nato", "type": "sub" },
+    { "name": "Ramstein Air Base", "lat": 49.437, "lng": 7.600, "team": "nato", "type": "air" },
+    { "name": "Incirlik Air Base", "lat": 37.001, "lng": 35.425, "team": "nato", "type": "air" },
+    { "name": "RAF Fylingdales (BMEWS)", "lat": 54.362, "lng": -0.666, "team": "nato", "type": "radar" },
+    { "name": "RAF Menwith Hill (Intel)", "lat": 54.009, "lng": -1.689, "team": "nato", "type": "intel" },
+    { "name": "Thule Air Base (BMEWS)", "lat": 76.531, "lng": -68.703, "team": "nato", "type": "radar" },
+
+    // --- BLUE TEAM: GLOBAL ---
+    { "name": "Pine Gap (Intel)", "lat": -23.799, "lng": 133.737, "team": "nato", "type": "intel" },
+    { "name": "Diego Garcia", "lat": -7.313, "lng": 72.411, "team": "nato", "type": "air" },
+
+    // --- RED TEAM: RUSSIA ---
+    { "name": "Nat. Defense Control Center", "lat": 55.650, "lng": 37.590, "team": "rus", "type": "command" }, // Adjusted Lat
+    { "name": "Kosvinsky Kamen (Bunker)", "lat": 59.516, "lng": 59.061, "team": "rus", "type": "command" },
+    { "name": "Mount Yamantau (Bunker)", "lat": 54.255, "lng": 58.102, "team": "rus", "type": "command" },
+    { "name": "Dombarovsky (ICBM)", "lat": 51.096, "lng": 59.837, "team": "rus", "type": "icbm" },
+    { "name": "Kozelsk (ICBM)", "lat": 53.797, "lng": 35.801, "team": "rus", "type": "icbm" },
+    { "name": "Tatishchevo (ICBM)", "lat": 51.666, "lng": 45.583, "team": "rus", "type": "icbm" },
+    { "name": "Plesetsk Cosmodrome", "lat": 62.927, "lng": 40.574, "team": "rus", "type": "icbm" },
+    { "name": "Engels-2 (Bombers)", "lat": 51.483, "lng": 46.211, "team": "rus", "type": "air" },
+    { "name": "Severomorsk (North Fleet)", "lat": 69.073, "lng": 33.430, "team": "rus", "type": "sub" },
+    { "name": "Gadzhiyevo (Sub Base)", "lat": 69.257, "lng": 33.321, "team": "rus", "type": "sub" },
+    { "name": "Vilyuchinsk (Pacific Sub)", "lat": 52.926, "lng": 158.423, "team": "rus", "type": "sub" },
+
+    // --- RED TEAM: CHINA ---
+    { "name": "Central Theater Command", "lat": 39.907, "lng": 116.321, "team": "chn", "type": "command" },
+    { "name": "Xiangshan (Bunker)", "lat": 39.954, "lng": 116.175, "team": "chn", "type": "command" },
+    { "name": "Lop Nur (Test Site)", "lat": 40.818, "lng": 88.667, "team": "chn", "type": "icbm" },
+    { "name": "Korla (Missile Base)", "lat": 41.727, "lng": 86.175, "team": "chn", "type": "icbm" },
+    { "name": "Yulin Naval Base", "lat": 18.207, "lng": 109.689, "team": "chn", "type": "sub" },
+    { "name": "Golmud Base", "lat": 36.400, "lng": 94.786, "team": "chn", "type": "icbm" },
+
+    // --- RED TEAM: NORTH KOREA ---
+    { "name": "Punggye-ri (Nuclear Test)", "lat": 41.280, "lng": 129.088, "team": "dprk", "type": "icbm" },
+    { "name": "Sohae (Launch Facility)", "lat": 39.660, "lng": 124.705, "team": "dprk", "type": "icbm" },
+    { "name": "Yongbyon (Reactor)", "lat": 39.799, "lng": 125.755, "team": "dprk", "type": "icbm" }
+];
+
+// Custom SVG Paths
+const ICONS = {
+    SQUARE: 'M -1,-1 1,-1 1,1 -1,1 z',
+    DIAMOND: 'M 0,-1.3 1.3,0 0,1.3 -1.3,0 z',
+    TRIANGLE: 'M 0,-1.5 1.3,1 -1.3,1 z'
+};
+
+let isWarGamesMode = false;
+let citiesDataLayer = null;
+let targetsDataLayer = null;
+
+function toggleWarGamesMode() {
+    isWarGamesMode = !isWarGamesMode;
+    const body = document.body;
+
+    if (isWarGamesMode) {
+        body.classList.add('wopr-mode');
+        map.setOptions({
+            mapTypeId: 'roadmap',
+            styles: WARGAMES_MAP_STYLE,
+            backgroundColor: '#000000'
+        });
+
+        // Load Coastlines
+        map.data.loadGeoJson(COASTLINE_GEOJSON_URL);
+        map.data.setStyle({
+            strokeColor: '#00ffff',
+            strokeWeight: 1,
+            fillOpacity: 0,
+            clickable: false
+        });
+
+        // Load Cities (Custom Layer - 110m for performance)
+        if (!citiesDataLayer) {
+            citiesDataLayer = new google.maps.Data({ map: map });
+            citiesDataLayer.loadGeoJson(CITIES_GEOJSON_URL);
+        } else {
+            citiesDataLayer.setMap(map);
+        }
+
+        // Style Cities
+        const updateCityStyle = () => {
+            const zoom = map.getZoom();
+            citiesDataLayer.setStyle(function (feature) {
+                // Show cities when zoomed in
+                const isVisible = zoom > 3;
+
+                return {
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 2,
+                        fillColor: '#00ffff',
+                        fillOpacity: 1,
+                        strokeWeight: 0
+                    },
+                    label: {
+                        text: feature.getProperty('NAME'), // Uppercase NAME for 110m
+                        color: '#00ffff',
+                        fontFamily: 'VT323',
+                        fontSize: '14px',
+                        className: 'wopr-label'
+                    },
+                    visible: isVisible,
+                    clickable: false,
+                    zIndex: 300 // Ensure cities are on top of targets
+                };
+            });
+        };
+
+        // Initial Style
+        updateCityStyle();
+
+        // Load Strategic Targets
+        if (!targetsDataLayer) {
+            targetsDataLayer = new google.maps.Data({ map: map });
+
+            const features = STRATEGIC_TARGETS.map(target => ({
+                type: "Feature",
+                geometry: {
+                    type: "Point",
+                    coordinates: [target.lng, target.lat]
+                },
+                properties: target
+            }));
+
+            targetsDataLayer.addGeoJson({
+                type: "FeatureCollection",
+                features: features
+            });
+        } else {
+            targetsDataLayer.setMap(map);
+        }
+
+        // Style Strategic Targets
+        const updateTargetStyle = () => {
+            const zoom = map.getZoom();
+
+            targetsDataLayer.setStyle(function (feature) {
+                const type = feature.getProperty('type');
+                const team = feature.getProperty('team');
+                const name = feature.getProperty('name');
+
+                let iconPath = google.maps.SymbolPath.CIRCLE; // Default (ICBM/Radar)
+                if (type === 'command' || type === 'intel') iconPath = ICONS.SQUARE;
+                else if (type === 'sub') iconPath = ICONS.DIAMOND;
+                else if (type === 'bomber' || type === 'air') iconPath = ICONS.TRIANGLE;
+
+                // Color Logic
+                let color = '#0088FF'; // Blue (Blue Team)
+                if (['rus', 'chn', 'dprk'].includes(team)) {
+                    color = '#FF0000'; // Red (Red Team)
+                }
+
+                // Show labels only when zoomed in
+                const showLabel = zoom > 5;
+
+                return {
+                    icon: {
+                        path: iconPath,
+                        scale: 4,
+                        fillColor: '#000000', // Black fill for wireframe look
+                        fillOpacity: 1,
+                        strokeColor: color,
+                        strokeWeight: 2,
+                        labelOrigin: new google.maps.Point(0, 4) // Position label below icon
+                    },
+                    label: showLabel ? {
+                        text: name,
+                        color: color,
+                        fontFamily: 'VT323',
+                        fontSize: '14px',
+                        className: 'wopr-label',
+                        fontWeight: 'bold'
+                    } : null,
+                    visible: true,
+                    clickable: false,
+                    zIndex: 200 // Below cities
+                };
+            });
+        };
+
+        updateTargetStyle();
+
+        // Add Zoom Listener for Cities & Targets
+        map.addListener('zoom_changed', function () {
+            if (isWarGamesMode) {
+                if (citiesDataLayer) updateCityStyle();
+                if (targetsDataLayer) updateTargetStyle();
+            }
+        });
+
+        // Update Night Layer for WOPR Mode
+        if (nightLayer) {
+            nightLayer.setOptions({
+                strokeColor: '#FF9900', // Truer Orange terminator
+                strokeWeight: 2,
+                fillColor: '#002244', // Deeper/More visible blue
+                fillOpacity: 0.6
+            });
+        }
+
+        // Update Branding
+        const branding = document.getElementById('branding');
+        if (branding) branding.innerText = 'SATELLITE TRACKER';
+
+        // Start Zulu Clock
+        startZuluClock();
+
+        console.log("GREETINGS PROFESSOR FALKEN.");
+    } else {
+        body.classList.remove('wopr-mode');
+        map.setOptions({
+            mapTypeId: 'hybrid',
+            styles: null
+        });
+
+        // Unload Coastlines (Clear Data Layer)
+        map.data.forEach(function (feature) {
+            map.data.remove(feature);
+        });
+
+        // Hide Cities
+        if (citiesDataLayer) {
+            citiesDataLayer.setMap(null);
+        }
+
+        // Hide Targets
+        if (targetsDataLayer) {
+            targetsDataLayer.setMap(null);
+        }
+
+        // Reset Night Layer
+        if (nightLayer) {
+            nightLayer.setOptions({
+                strokeWeight: 0,
+                fillColor: '#000000',
+                fillOpacity: 0.7
+            });
+        }
+
+        // Reset Branding
+        const branding = document.getElementById('branding');
+        if (branding) branding.innerText = 'AIRBUS PLEIADES NEO';
+
+        // Stop Zulu Clock
+        stopZuluClock();
+    }
+}
+
+let zuluInterval;
+
+function startZuluClock() {
+    updateZuluClock(); // Run immediately
+    zuluInterval = setInterval(updateZuluClock, 1000);
+}
+
+function stopZuluClock() {
+    clearInterval(zuluInterval);
+}
+
+function updateZuluClock() {
+    const now = new Date();
+    const hours = now.getUTCHours().toString().padStart(2, '0');
+    const minutes = now.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = now.getUTCSeconds().toString().padStart(2, '0');
+
+    const clockElement = document.getElementById('zulu-clock');
+    if (clockElement) {
+        clockElement.innerText = `${hours}:${minutes}:${seconds} ZULU`;
+    }
 }
 
 /**

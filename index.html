@@ -5,14 +5,24 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Satellite Tracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css?v=2">
     <!-- Load satellite.js from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/satellite.js/4.0.0/satellite.min.js"></script>
 </head>
 
 <body>
+    <div id="crt-overlay"></div>
+
+    <!-- WarGames Status Display -->
+    <div id="wopr-status">
+        <div id="zulu-clock"></div>
+    </div>
+
     <div id="map"></div>
-    <div id="branding"><strong>AIRBUS</strong> | PLEIADES NEO</div>
+    <div id="branding">AIRBUS PLEIADES NEO</div>
     <div id="controls">
         <label><input type="checkbox" id="toggleSolar"> Poor Sun Angle</label>
         <label><input type="checkbox" id="toggleSnow"> Snow Cover</label>
