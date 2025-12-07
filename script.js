@@ -112,6 +112,7 @@ function initMap() {
     attributionDiv.style.padding = '2px 5px';
     attributionDiv.style.fontSize = '10px';
     attributionDiv.style.margin = '5px';
+    attributionDiv.id = 'nasa-attribution';
     attributionDiv.innerHTML = 'Data: <a href="https://earthdata.nasa.gov/eosdis/science-system-description/eosdis-components/gibs" target="_blank">NASA GIBS</a>';
     attributionDiv.style.display = 'none'; // Hidden by default
     map.controls[google.maps.ControlPosition.BOTTOM_RIGHT].push(attributionDiv);
@@ -720,9 +721,29 @@ async function handlePrediction() {
     if (!locationInput) return;
 
     // Secret Code Trigger
-    if (locationInput.trim().toUpperCase() === "JOSHUA") {
-        toggleWarGamesMode();
+    const inputUpper = locationInput.trim().toUpperCase();
+    if (inputUpper === "JOSHUA" || inputUpper === "WOPR" || inputUpper === "WOPR1") {
+        let scenario = null;
+        if (inputUpper === "WOPR" || inputUpper === "WOPR1") scenario = 1;
+
+        toggleWarGamesMode(scenario);
         document.getElementById('locationInput').value = ""; // Clear input
+        return;
+    }
+
+    // WOPR Mode Trigger (WOPR, WOPR1, WOPR2, etc.)
+    if (inputUpper.startsWith("WOPR")) {
+        // Extract scenario ID if present
+        let scenarioId = null;
+        if (inputUpper.length > 4) {
+            const idPart = inputUpper.substring(4);
+            if (!isNaN(parseInt(idPart))) {
+                scenarioId = parseInt(idPart);
+            }
+        }
+
+        initWoprMode(scenarioId);
+        document.getElementById('locationInput').value = "";
         return;
     }
 
@@ -1431,6 +1452,7 @@ async function displayResults(passes) {
             <td>${cloudText}</td>
         `;
 
+
         tbody.appendChild(row);
     }
 
@@ -1446,4 +1468,986 @@ function showLoading(isLoading) {
 function clearResults() {
     document.querySelector('#resultsTable tbody').innerHTML = '';
     document.getElementById('no-results').style.display = 'none';
+}
+
+/**
+ * WOPR Mode Initialization
+ * 
+ * Simulates a Global Thermonuclear War scenario.
+ * - Reuses WarGames styling (Crt overlay, map style)
+ * - Hides all satellite tracking UI and data
+ * - Starts a specific or random scenario
+ */
+
+
+function toggleWarGamesMode(scenarioIdOverride) {
+    isWarGamesMode = !isWarGamesMode;
+    const body = document.body;
+
+    if (isWarGamesMode) {
+        body.classList.add('wopr-mode');
+        map.setOptions({
+            mapTypeId: 'roadmap',
+            styles: WARGAMES_MAP_STYLE,
+            backgroundColor: '#000000'
+        });
+
+        // Load Coastlines
+        map.data.loadGeoJson(COASTLINE_GEOJSON_URL);
+        map.data.setStyle({
+            strokeColor: '#00ffff',
+            strokeWeight: 1,
+            fillOpacity: 0,
+            clickable: false
+        });
+
+        // Load Cities (Custom Layer - 110m for performance)
+        if (!citiesDataLayer) {
+            citiesDataLayer = new google.maps.Data({ map: map });
+            citiesDataLayer.loadGeoJson(CITIES_GEOJSON_URL);
+        } else {
+            citiesDataLayer.setMap(map);
+        }
+
+        // Force specific city style for WOPR
+        citiesDataLayer.setStyle(function (feature) {
+            return {
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 2,
+                    fillColor: '#00ffff',
+                    fillOpacity: 1,
+                    strokeWeight: 0
+                },
+                visible: true, // Always show in WOPR? Or depend on zoom? Let's stick to zoom for perf
+                clickable: false,
+                zIndex: 300
+            };
+        });
+
+        // Load Targets
+        if (!targetsDataLayer) {
+            targetsDataLayer = new google.maps.Data({ map: map });
+            const features = STRATEGIC_TARGETS.map(target => ({
+                type: "Feature",
+                geometry: { type: "Point", coordinates: [target.lng, target.lat] },
+                properties: target
+            }));
+            targetsDataLayer.addGeoJson({ type: "FeatureCollection", features: features });
+        } else {
+            targetsDataLayer.setMap(map);
+        }
+
+        // Target Style
+        targetsDataLayer.setStyle(function (feature) {
+            const type = feature.getProperty('type');
+            const team = feature.getProperty('team');
+            let iconPath = google.maps.SymbolPath.CIRCLE;
+            if (type === 'command' || type === 'intel') iconPath = ICONS.SQUARE;
+            else if (type === 'sub') iconPath = ICONS.DIAMOND;
+            else if (type === 'bomber' || type === 'air') iconPath = ICONS.TRIANGLE;
+
+            let color = '#0088FF';
+            if (['rus', 'chn', 'dprk'].includes(team)) color = '#FF0000';
+
+            return {
+                icon: {
+                    path: iconPath,
+                    scale: 4,
+                    fillColor: '#000000',
+                    fillOpacity: 1,
+                    strokeColor: color,
+                    strokeWeight: 2,
+                    labelOrigin: new google.maps.Point(0, 4)
+                },
+                visible: true,
+                clickable: false,
+                zIndex: 200
+            };
+        });
+
+        // 3. UI Cleanup (Hide Satellite Stuff)
+        const uiToHide = [
+            'prediction-panel',
+            'controls',        // The bottom-left toggle controls
+            'legends-container'
+        ];
+
+        uiToHide.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        // Update Branding
+        const branding = document.getElementById('branding');
+        if (branding) {
+            branding.style.display = 'block';
+            branding.innerHTML = '<b>W</b>ar <b>O</b>peration <b>P</b>lan <b>R</b>esponse';
+        }
+
+        // Hide Real Satellites
+        satellites.forEach(sat => {
+            if (sat.marker) sat.marker.setMap(null);
+            if (sat.pastPath) sat.pastPath.setMap(null);
+            if (sat.futurePath) sat.futurePath.setMap(null);
+            sat.cones.forEach(cone => cone.setMap(null));
+        });
+
+        // Hide Layers
+        if (snowCoverLayer && map.overlayMapTypes) {
+            map.overlayMapTypes.forEach((layer, index) => {
+                if (layer === snowCoverLayer || layer === cloudCoverLayer) {
+                    map.overlayMapTypes.removeAt(index);
+                }
+            });
+        }
+        if (solarAngleLayer) solarAngleLayer.setMap(null);
+        if (window.marginalSolarLayer) window.marginalSolarLayer.setMap(null);
+
+        // Ensure Night Layer covers WOPR needs (maybe adjustable later)
+        if (nightLayer) {
+            // User requested NO terminator in WOPR mode
+            nightLayer.setMap(null);
+        }
+
+        // 4. Start Scenario
+        // If no ID provided, pick random
+        const totalScenarios = 3; // Placeholder count
+        let scenarioId = scenarioIdOverride;
+        if (!scenarioId) {
+            scenarioId = Math.floor(Math.random() * totalScenarios) + 1;
+        }
+
+        // Start Zulu Clock
+        startZuluClock();
+
+        // Init Scenario Manager
+        if (!window.scenarioManager) {
+            window.scenarioManager = new ScenarioManager(map);
+        }
+        window.scenarioManager.start(scenarioId);
+    }
+}
+
+// --- WOPR Scenario Engine ---
+
+class ScenarioManager {
+    constructor(map) {
+        this.map = map;
+        this.activeMissiles = [];
+        this.activeDetonations = [];
+        this.timeouts = [];
+        this.isRunning = false;
+        this.userLocation = null;
+    }
+
+    async start(id) {
+        this.stop(); // Clear any existing
+        this.isRunning = true;
+        console.log(`Starting Scenario ${id}`);
+        updateDefcon(1); // Reset
+
+        // Get user location for the finale
+        if (window.lastObserverCoords) {
+            this.userLocation = { lat: window.lastObserverCoords.lat(), lng: window.lastObserverCoords.lng() };
+        } else {
+            this.userLocation = await this.fetchUserLocation();
+        }
+
+        if (id === 1) this.runScenario1();
+        else if (id === 2) console.log("Scenario 2 not implemented");
+        else if (id === 3) console.log("Scenario 3 not implemented");
+    }
+
+    stop() {
+        this.isRunning = false;
+        this.timeouts.forEach(t => clearTimeout(t));
+        this.timeouts = [];
+        this.activeMissiles.forEach(m => m.remove());
+        this.activeMissiles = [];
+        this.activeDetonations.forEach(d => d.remove());
+        this.activeDetonations = [];
+
+        // Clear Game Over
+        const go = document.getElementById('game-over-overlay');
+        if (go) go.style.display = 'none';
+        document.body.classList.remove('shutter-effect');
+    }
+
+    schedule(ms, callback) {
+        const t = setTimeout(() => {
+            if (this.isRunning) callback();
+        }, ms);
+        this.timeouts.push(t);
+    }
+
+    updateDefcon(level) {
+        const display = document.getElementById('defcon-display');
+        if (display) {
+            display.innerText = `DEFCON ${level}`;
+            if (level === 1) { // 1 is CRITICAL
+                display.classList.add('defcon-1');
+            } else {
+                display.classList.remove('defcon-1');
+            }
+        }
+    }
+
+    async fetchUserLocation() {
+        try {
+            const resp = await fetch('https://ipapi.co/json/');
+            const data = await resp.json();
+            return { lat: data.latitude, lng: data.longitude };
+        } catch (e) {
+            console.warn("IP Geo failed, defaulting to NYC", e);
+            return { lat: 40.7128, lng: -74.0060 }; // Default NYC
+        }
+    }
+
+    // New: GBI Intercept Logic
+    attemptIntercept(incomingMissile, defender) {
+        // Check Limits
+        if (!this.gbiCounts) this.gbiCounts = { 'US': 10, 'RU': 10, 'EU': 5, 'JP': 5 };
+        if (this.gbiCounts[defender] <= 0) return; // Out of ammo
+
+        // Decrement
+        this.gbiCounts[defender]--;
+
+        // 35% chance of success
+        const isSuccess = Math.random() < 0.35;
+
+        // Intercept at 70-85% of flight path (Slows down GBI by giving it more time)
+        const interceptRatio = 0.7 + (Math.random() * 0.15);
+
+        // Calculate coordinate
+        const interceptPos = google.maps.geometry.spherical.interpolate(
+            new google.maps.LatLng(incomingMissile.origin),
+            new google.maps.LatLng(incomingMissile.target),
+            interceptRatio
+        );
+
+        // Timing
+        // Simulate detection gap: 15 mins to detect/setup, 15 mins to fly (~50%)
+        const flightTimeTotal = incomingMissile.duration;
+        const detectionTime = flightTimeTotal * 0.5;
+
+        setTimeout(() => {
+            if (!this.isRunning || incomingMissile.destroyed) return;
+
+            const timeToIntercept = flightTimeTotal * interceptRatio;
+            const remainingTime = timeToIntercept - detectionTime;
+
+            // Travel time for interceptor
+            const interceptorDuration = remainingTime; // It has to get there exactly when the nuke does
+
+            if (interceptorDuration < 2000) return; // Too late / too fast
+
+            // Pick Launch Site
+            let sites = [];
+            if (defender === 'US') {
+                sites = [{ lat: 63.9, lng: -145.7 }, { lat: 34.7, lng: -120.6 }, { lat: 43.9, lng: -75.6 }]; // Ft Greely, Vandenberg, Ft Drum
+            } else if (defender === 'RU') {
+                sites = [{ lat: 55.7, lng: 37.6 }, { lat: 46.0, lng: 73.0 }, { lat: 53.0, lng: 158.0 }]; // Moscow, Sary Shagan, Kamchatka
+            } else if (defender === 'EU') {
+                sites = [{ lat: 54.3, lng: -0.6 }, { lat: 44.0, lng: 24.3 }]; // Fylingdales (UK), Deveselu (RO)
+            } else if (defender === 'JP') {
+                sites = [{ lat: 40.9, lng: 140.3 }, { lat: 35.7, lng: 135.2 }]; // Shariki, Kyogamisaki
+            }
+
+            // Find nearest
+            let bestSite = sites[0];
+            // Simple logic: pick random or nearest. Nearest is better visual.
+            let minDist = Infinity;
+            const iPosLat = interceptPos.lat();
+            const iPosLng = interceptPos.lng();
+
+            sites.forEach(site => {
+                const d = Math.abs(site.lat - iPosLat) + Math.abs(site.lng - iPosLng); // Rough dist
+                if (d < minDist) {
+                    minDist = d;
+                    bestSite = site;
+                }
+            });
+
+            // Launch Interceptor (White)
+            const interceptor = this.launchMissile(bestSite, interceptPos, '#FFFFFF', interceptorDuration, false);
+
+            // Schedule Result
+            setTimeout(() => {
+                if (!this.isRunning) return;
+
+                // Interceptor Explodes (White flash)
+                interceptor.destroy();
+                this.detonate(interceptPos, 150000, '#FFFFFF');
+
+                if (isSuccess) {
+                    incomingMissile.destroy();
+                }
+            }, interceptorDuration);
+
+        }, detectionTime);
+    }
+
+    // Magical User Defense (100% Accuracy)
+    attemptUserIntercept(incomingMissile) {
+        if (!this.userLocation) return;
+
+        // Check if heading for user (approx < 100 miles / 160km)
+        const d = google.maps.geometry.spherical.computeDistanceBetween(
+            new google.maps.LatLng(incomingMissile.target),
+            new google.maps.LatLng(this.userLocation)
+        );
+
+        if (d > 160000) return; // Not a threat to user (outside 100mi)
+
+        // Launch from User
+        const interceptPos = incomingMissile.target;
+        const interceptRatio = 0.8;
+        const iPos = google.maps.geometry.spherical.interpolate(
+            new google.maps.LatLng(incomingMissile.origin),
+            new google.maps.LatLng(incomingMissile.target),
+            interceptRatio
+        );
+
+        const flightTime = incomingMissile.duration * interceptRatio;
+        const reactionDelay = 500; // Fast reaction
+        const interceptorDur = flightTime - reactionDelay;
+
+        if (interceptorDur < 500) return; // Too close
+
+        setTimeout(() => {
+            if (incomingMissile.destroyed) return;
+            // Magical Interceptor (Now White)
+            const m = this.launchMissile(this.userLocation, iPos, '#FFFFFF', interceptorDur, false);
+
+            setTimeout(() => {
+                m.destroy();
+                this.detonate(iPos, 100000, '#FFFFFF'); // White flash
+                incomingMissile.destroy();
+            }, interceptorDur);
+        }, reactionDelay);
+    }
+
+    launchMissile(origin, target, color, speedMs, detonateOnImpact = true) {
+        const missile = new Missile(this.map, origin, target, color, speedMs);
+        this.activeMissiles.push(missile);
+        missile.onImpact = () => {
+            if (detonateOnImpact && !missile.destroyed) {
+                // Red blooms, slightly smaller
+                this.detonate(target, 350000, '#FF0000');
+            }
+        };
+        missile.launch();
+        return missile;
+    }
+
+    detonate(coords, size = 350000, color = '#FF0000') {
+        // Force Red for nuke hits
+        let finalColor = color;
+        const isNuke = ['#FF0000', '#0088FF', '#FF9900', '#00FF00', '#CC00FF'].includes(color);
+        if (isNuke) {
+            finalColor = '#FF0000';
+
+            // Screen Flutter visual if close to user (< 500 miles / 800km)
+            if (this.userLocation) {
+                const d = google.maps.geometry.spherical.computeDistanceBetween(
+                    new google.maps.LatLng(coords),
+                    new google.maps.LatLng(this.userLocation)
+                );
+                if (d < 800000) {
+                    document.body.classList.remove('screen-flutter');
+                    void document.body.offsetWidth; // trigger reflow
+                    document.body.classList.add('screen-flutter');
+                }
+            }
+        }
+
+        const detonation = new Detonation(this.map, coords, size, finalColor);
+        this.activeDetonations.push(detonation);
+        detonation.explode();
+    }
+
+    triggerGameOver() {
+        console.log("GAME OVER SEQUENCE INITIATED");
+        document.body.classList.remove('screen-flutter'); // Ensure flutter doesn't block shutter
+        void document.body.offsetWidth; // Force reflow
+        document.body.classList.add('shutter-effect');
+        setTimeout(() => {
+            const overlay = document.getElementById('game-over-overlay');
+            if (overlay) overlay.style.display = 'flex';
+        }, 2500); // 2.5s delay (User requested "couple seconds")
+    }
+
+    // --- SCENARIO 1: HOUSE OF DYNAMITE (GLOBAL WAR) ---
+    runScenario1() {
+        // Reset GBIs (Increased counts)
+        this.gbiCounts = { 'US': 15, 'RU': 15, 'EU': 7, 'JP': 5 };
+
+        // --- COORDINATES (DETAILED) ---
+        const ARCTIC = { lat: 80, lng: -90 };
+        const CHICAGO = { lat: 41.8781, lng: -87.6298 };
+        const FT_GREELY = { lat: 63.9, lng: -145.7 };
+
+        // LAUNCH SITES
+        const SILO_BELT = [{ lat: 47.5, lng: -111.0 }, { lat: 48.0, lng: -101.0 }, { lat: 41.0, lng: -104.0 }];
+        // Updated User Coordinates
+        const US_ATLANTIC_SUBS = [{ lat: 46.57, lng: -32.84 }];
+        const US_PACIFIC_SUBS = [{ lat: 12.30, lng: 135.48 }, { lat: 29.48, lng: 139.65 }];
+
+        const RU_LAUNCH = [{ lat: 45.9, lng: 63.3 }, { lat: 62.9, lng: 40.5 }, { lat: 54.0, lng: 35.8 }];
+        const RU_SUBS = [{ lat: 70, lng: 40 }, { lat: 55, lng: 160 }];
+        // Updated User Coordinates
+        const RU_ATLANTIC_FLEET = [{ lat: 25.85, lng: -64.45 }, { lat: 36.91, lng: -49.86 }];
+        const RU_PACIFIC_FLEET = [{ lat: 50.45, lng: -144.01 }, { lat: 19.93, lng: -129.00 }];
+
+        const CN_LAUNCH = [{ lat: 30.5, lng: 104.0 }, { lat: 36.6, lng: 101.7 }];
+        const EU_LAUNCH = [{ lat: 56.0, lng: -4.8 }, { lat: 48.3, lng: -4.5 }];
+
+        // TARGET LISTS (Flattened for usage)
+
+        // Phase 3: US First Strike Targets (Russian Mil/C2)
+        const US_FIRST_STRIKE_TARGETS = [
+            { lat: 54.02, lng: 35.46 }, { lat: 51.40, lng: 45.34 }, { lat: 55.20, lng: 89.48 }, // Silos
+            { lat: 50.45, lng: 59.30 }, { lat: 53.02, lng: 60.36 }, { lat: 56.34, lng: 48.02 },
+            { lat: 51.48, lng: 46.21 }, { lat: 51.10, lng: 128.26 }, { lat: 54.38, lng: 39.34 }, // Bombers
+            { lat: 69.25, lng: 33.29 }, { lat: 52.92, lng: 158.42 }, { lat: 69.06, lng: 33.25 }, // Naval
+            { lat: 55.75, lng: 37.62 }, { lat: 59.31, lng: 59.18 }, { lat: 56.10, lng: 37.59 }, // C2
+            { lat: 39.80, lng: 125.75 }, { lat: 41.28, lng: 129.08 }, { lat: 39.66, lng: 124.70 } // NK
+        ];
+
+        // Phase 4: Russia Launch Targets (US/NATO Civil/Mil)
+        const RUSSIA_LAUNCH_TARGETS = [
+            // US Strategic
+            { lat: 47.50, lng: -111.18 }, { lat: 48.41, lng: -101.35 }, { lat: 41.13, lng: -104.87 },
+            { lat: 38.72, lng: -93.54 }, { lat: 32.50, lng: -93.66 }, { lat: 32.42, lng: -99.85 },
+            { lat: 47.74, lng: -122.73 }, { lat: 30.79, lng: -81.53 }, { lat: 56.06, lng: -4.82 },
+            { lat: 48.30, lng: -4.50 }, { lat: 48.20, lng: -121.92 },
+            // US Hubs
+            { lat: 40.71, lng: -74.00 }, { lat: 38.90, lng: -77.03 }, { lat: 41.87, lng: -87.62 },
+            { lat: 34.05, lng: -118.24 }, { lat: 37.77, lng: -122.41 }, { lat: 29.76, lng: -95.36 },
+            { lat: 47.60, lng: -122.33 },
+            // NATO C2
+            { lat: 50.88, lng: 4.43 }, { lat: 50.50, lng: 3.98 }, { lat: 51.62, lng: -0.41 },
+            { lat: 49.44, lng: 7.60 }, { lat: 51.50, lng: -0.12 }, { lat: 48.85, lng: 2.35 }, { lat: 52.52, lng: 13.40 },
+            // Infra
+            { lat: 35.31, lng: -101.56 }, { lat: 35.99, lng: -84.26 }, { lat: 35.84, lng: -106.28 },
+            // US Northeast
+            { lat: 40.73, lng: -74.17 }, { lat: 40.71, lng: -74.04 }, { lat: 41.82, lng: -71.41 },
+            { lat: 41.76, lng: -72.67 }, { lat: 42.88, lng: -78.87 }, { lat: 40.44, lng: -79.99 },
+            { lat: 36.85, lng: -75.97 }, { lat: 35.77, lng: -78.63 }, { lat: 35.22, lng: -80.84 },
+            // US Heartland
+            { lat: 44.97, lng: -93.26 }, { lat: 38.62, lng: -90.19 }, { lat: 39.09, lng: -94.57 },
+            { lat: 39.76, lng: -86.15 }, { lat: 39.96, lng: -82.99 }, { lat: 39.10, lng: -84.51 },
+            { lat: 36.16, lng: -86.78 }, { lat: 35.14, lng: -90.04 }, { lat: 29.42, lng: -98.49 },
+            { lat: 30.26, lng: -97.74 }, { lat: 28.53, lng: -81.37 }, { lat: 27.95, lng: -82.45 },
+            // US West
+            { lat: 36.16, lng: -115.13 }, { lat: 45.51, lng: -122.67 }, { lat: 38.58, lng: -121.49 },
+            { lat: 40.76, lng: -111.89 }, { lat: 32.22, lng: -110.97 }, { lat: 35.08, lng: -106.60 },
+            // Canada
+            { lat: 45.42, lng: -75.69 }, { lat: 51.04, lng: -114.07 }, { lat: 53.54, lng: -113.49 },
+            { lat: 49.28, lng: -123.12 }, { lat: 49.89, lng: -97.13 }, { lat: 46.81, lng: -71.20 }, { lat: 44.64, lng: -63.57 },
+            // NATO Europe (Aggregated + New additions)
+            { lat: 48.13, lng: 11.58 }, { lat: 53.55, lng: 9.99 }, { lat: 50.93, lng: 6.96 }, // DE
+            { lat: 45.46, lng: 9.19 }, { lat: 40.85, lng: 14.26 }, // IT
+            { lat: 45.76, lng: 4.83 }, { lat: 43.29, lng: 5.36 }, // FR
+            { lat: 41.38, lng: 2.16 }, // ES
+            { lat: 53.48, lng: -2.24 }, { lat: 52.48, lng: -1.89 }, { lat: 55.86, lng: -4.25 }, // UK
+            { lat: 50.85, lng: 4.35 }, { lat: 51.92, lng: 4.47 }, // BE/NL
+            { lat: 55.67, lng: 12.56 }, { lat: 59.91, lng: 10.75 }, { lat: 59.32, lng: 18.06 }, { lat: 60.16, lng: 24.93 }, // Scandi
+            // New Eastern/Southern additions
+            { lat: 40.41, lng: -3.70 }, // Madrid
+            { lat: 37.98, lng: 23.72 }, // Athens
+            { lat: 41.00, lng: 28.97 }, // Istanbul
+            { lat: 44.42, lng: 26.10 }, // Bucharest
+            { lat: 43.21, lng: 27.91 }, // Varna
+            { lat: 46.48, lng: 30.72 }, // Odesa
+            { lat: 50.45, lng: 30.52 },  // Kyiv
+            // User requested additions
+            { lat: 25.76, lng: -80.19 }, // Miami
+            { lat: 52.22, lng: 21.01 }   // Warsaw
+        ];
+
+        // Phase 5: US/NATO Retaliation (Targets in Russia)
+        const US_NATO_RETALIATION_TARGETS = [
+            // Capitals
+            { lat: 55.75, lng: 37.61 }, { lat: 55.99, lng: 37.21 }, { lat: 55.67, lng: 37.89 }, // Moscow
+            { lat: 59.93, lng: 30.33 }, { lat: 59.86, lng: 30.23 }, // St Pete
+            // Volga
+            { lat: 56.32, lng: 44.00 }, { lat: 55.79, lng: 49.10 }, { lat: 53.24, lng: 50.22 },
+            { lat: 48.70, lng: 44.51 }, { lat: 51.54, lng: 46.00 }, { lat: 53.50, lng: 49.41 }, { lat: 54.31, lng: 48.39 },
+            // Urals
+            { lat: 56.83, lng: 60.60 }, { lat: 55.16, lng: 61.43 }, { lat: 54.73, lng: 55.95 },
+            { lat: 58.00, lng: 56.22 }, { lat: 56.84, lng: 53.20 },
+            // Siberia
+            { lat: 55.00, lng: 82.93 }, { lat: 54.98, lng: 73.36 }, { lat: 56.01, lng: 92.86 },
+            { lat: 52.28, lng: 104.30 }, { lat: 53.35, lng: 83.76 },
+            // South/Far East
+            { lat: 47.23, lng: 39.70 }, { lat: 45.03, lng: 38.97 }, { lat: 43.11, lng: 131.88 }, { lat: 48.48, lng: 135.07 }
+        ];
+
+        // Phase 6: China "Dragon Wakes" (T+32s) - SPECIFIC TARGETS
+        const CN_PACIFIC_TARGETS = [
+            { lat: 61.2, lng: -149.9 }, { lat: 49.3, lng: -123.1 }, // Anchorage, Vancouver
+            { lat: 47.6, lng: -122.3 }, { lat: 45.5, lng: -122.7 }, // Seattle, Portland
+            { lat: 38.6, lng: -121.5 }, { lat: 37.8, lng: -122.4 }, // Sacramento, SF
+            { lat: 34.0, lng: -118.2 }, { lat: 32.7, lng: -117.2 }, // LA, San Diego
+            { lat: 21.3, lng: -157.8 }, // Honolulu
+            { lat: -33.9, lng: 151.2 }, { lat: -23.8, lng: 133.7 }, // Sydney, Pine Gap
+            { lat: -31.9, lng: 115.8 }, { lat: -37.8, lng: 144.9 }, // Perth, Melbourne
+            { lat: -34.9, lng: 138.6 }, { lat: -35.2, lng: 149.1 }, // Adelaide, Canberra
+            { lat: -27.4, lng: 153.0 }, // Brisbane
+            { lat: -7.3, lng: 72.4 },  // Diego Garcia
+            { lat: 35.7, lng: 139.7 }, { lat: 34.7, lng: 135.5 }, // Tokyo, Osaka
+            { lat: 33.6, lng: 130.4 }, { lat: 35.2, lng: 136.9 }, // Fukuoka, Nagoya
+            { lat: 37.9, lng: 139.0 }, { lat: 38.3, lng: 140.9 }, // Niigata, Sendai
+            { lat: 43.1, lng: 141.3 }, // Sapporo
+            { lat: 1.35, lng: 103.8 }, { lat: 37.6, lng: 127.0 }  // Singapore, Seoul
+        ];
+
+        // Phase 7: US Pacific Retaliation (T+37s)
+        const CN_TARGETS = [
+            // Coastal
+            { lat: 39.90, lng: 116.40 }, { lat: 31.23, lng: 121.47 }, { lat: 39.34, lng: 117.36 },
+            { lat: 23.12, lng: 113.26 }, { lat: 22.54, lng: 114.05 }, { lat: 22.31, lng: 114.16 },
+            { lat: 32.06, lng: 118.79 }, { lat: 30.27, lng: 120.15 },
+            // Inland
+            { lat: 29.56, lng: 106.55 }, { lat: 30.57, lng: 104.06 }, { lat: 30.59, lng: 114.30 },
+            { lat: 34.34, lng: 108.93 }, { lat: 45.80, lng: 126.53 },
+            // Strategic
+            { lat: 34.38, lng: 111.65 }, { lat: 37.37, lng: 97.36 }, { lat: 42.81, lng: 93.51 },
+            { lat: 40.26, lng: 96.72 }, { lat: 28.24, lng: 102.02 },
+            // Naval
+            { lat: 18.22, lng: 109.48 }, { lat: 36.10, lng: 120.50 },
+            // Strait
+            { lat: 26.07, lng: 119.29 }, { lat: 24.47, lng: 118.08 }, { lat: 29.86, lng: 121.54 }
+        ];
+
+        // REGIONAL
+        const REGIONAL_TARGETS = {
+            INDIA: [{ lat: 31.52, lng: 74.35 }, { lat: 24.86, lng: 67.00 }, { lat: 30.15, lng: 71.52 }, { lat: 33.68, lng: 73.04 }], // Lahore, Karachi, Multan, Islamabad
+            PAKISTAN: [
+                { lat: 28.61, lng: 77.20 }, { lat: 19.07, lng: 72.87 }, { lat: 23.02, lng: 72.57 },
+                { lat: 26.84, lng: 80.94 }, { lat: 18.52, lng: 73.85 }, { lat: 12.97, lng: 77.59 },
+                { lat: 17.38, lng: 78.48 }, { lat: 15.29, lng: 74.12 }, { lat: 13.08, lng: 80.27 },
+                { lat: 22.57, lng: 88.36 }
+            ], // Delhi, Mumbai, Ahmedabad, Lucknow, Pune, Bangalore, Hyderabad, Goa, Chennai, Kolkata
+            IRAN: [{ lat: 32.79, lng: 34.99 }, { lat: 31.76, lng: 35.21 }, { lat: 32.08, lng: 34.78 }], // Haifa, Jerusalem, Tel Aviv
+            ISRAEL: [{ lat: 35.68, lng: 51.38 }, { lat: 38.09, lng: 46.29 }, { lat: 29.59, lng: 52.58 }, { lat: 34.64, lng: 50.87 }] // Tehran, Tabriz, Shiraz, Qom
+        };
+
+        // India Launch Sites (approx)
+        const INDIA_LAUNCH = [{ lat: 21.1, lng: 79.0 }];
+        const PAKISTAN_LAUNCH = [{ lat: 30.2, lng: 67.0 }];
+        const IRAN_LAUNCH = [{ lat: 34.0, lng: 51.0 }];
+        const ISRAEL_LAUNCH = [{ lat: 31.5, lng: 34.5 }];
+
+
+        // T+0: Start
+        console.log("Scenario 1 Started");
+        this.updateDefcon(5);
+
+        // Phase 1: Mystery Inbound (T+5s) -> Impacts at T+20s
+        this.schedule(5000, () => {
+            this.updateDefcon(3);
+            this.launchMissile(ARCTIC, CHICAGO, '#FF0000', 15000, true);
+        });
+
+        // Phase 2: Intercept (T+8s)
+        this.schedule(8000, () => {
+            this.updateDefcon(2);
+            // Scripted Failure
+            const m1 = this.launchMissile(FT_GREELY, { lat: 62, lng: -92 }, '#00FFFF', 4000, false);
+            const m2 = this.launchMissile(FT_GREELY, { lat: 62, lng: -88 }, '#00FFFF', 4000, false);
+            m1.onImpact = () => this.detonate(m1.target, 150000, '#FFFFFF'); // White Intercept
+            m2.onImpact = () => this.detonate(m2.target, 150000, '#FFFFFF');
+        });
+
+        // Phase 3: US Panic Fire (T+18s) - COUNTER FORCE
+        this.schedule(18000, () => {
+            this.updateDefcon(1); // FLASHING RED
+            const targets = US_FIRST_STRIKE_TARGETS;
+            // One warhead per target
+            for (let i = 0; i < targets.length; i++) {
+                const origin = SILO_BELT[i % SILO_BELT.length];
+                const target = targets[i];
+
+                const jitOrg = { lat: origin.lat + Math.random(), lng: origin.lng + Math.random() };
+                const m = this.launchMissile(jitOrg, target, '#0088FF', 10000 + Math.random() * 2000, true);
+                this.attemptIntercept(m, 'RU');
+            }
+        });
+
+        // Phase 4: Russia Launch on Warning (T+25s) - MASSIVE SATURATION
+        this.schedule(25000, () => {
+            // Filter Targets
+            const westTargets = [];
+            const eastTargets = [];
+            const mainlandTargets = [];
+
+            RUSSIA_LAUNCH_TARGETS.forEach(t => {
+                if (t.lng < -100) {
+                    westTargets.push(t);
+                } else if (t.lng > -90 && t.lng < -60 && t.lat < 50) { // East Coast approx
+                    eastTargets.push(t);
+                } else {
+                    mainlandTargets.push(t);
+                }
+            });
+
+            // Launch Helper
+            const launchVolley = (targets, origins, isFleet) => {
+                for (let i = 0; i < targets.length; i++) {
+                    // If fleet, +4s delay. If mainland, staggering 0-5s
+                    const delay = isFleet ? 4000 + (Math.random() * 1000) : (Math.random() * 5000);
+
+                    setTimeout(() => {
+                        const target = targets[i];
+                        // Round-robin origins
+                        const origin = origins[i % origins.length];
+
+                        const jitOrg = { lat: origin.lat + Math.random(), lng: origin.lng + Math.random() };
+                        const jitTgt = { lat: target.lat + Math.random(), lng: target.lng + Math.random() };
+
+                        const m = this.launchMissile(jitOrg, jitTgt, '#FF0000', 15000 + Math.random() * 5000, true);
+                        this.attemptUserIntercept(m); // PROTECT PLAYER
+
+                        // Intercepts
+                        if (target.lng > -30 && target.lng < 40) {
+                            this.attemptIntercept(m, 'EU');
+                        } else {
+                            this.attemptIntercept(m, 'US');
+                        }
+                    }, delay);
+                }
+            };
+
+            // Execute
+            console.log(`Phase 4: Launching. West Total: ${westTargets.length}, East Total: ${eastTargets.length}, Main: ${mainlandTargets.length}`);
+
+            // User request: Fleets shoot 3 each (per sub). 2 subs = 6 targets total.
+            const fleetWest = westTargets.slice(0, 6);
+            const remainderWest = westTargets.slice(6);
+
+            const fleetEast = eastTargets.slice(0, 6);
+            const remainderEast = eastTargets.slice(6);
+
+            // Add remainders back to mainland
+            mainlandTargets.push(...remainderWest, ...remainderEast);
+
+            launchVolley(fleetWest, RU_PACIFIC_FLEET, true);
+            launchVolley(fleetEast, RU_ATLANTIC_FLEET, true);
+
+            // Mainland sources: Launch sites + Subs
+            const mainlandOrigins = [...RU_LAUNCH, ...RU_SUBS];
+            launchVolley(mainlandTargets, mainlandOrigins, false);
+        });
+
+        // Phase 5: US/NATO Atlantic Retaliation (T+30s) - MASSIVE SATURATION
+        this.schedule(30000, () => {
+            // Atlantic Subs & EU Launch -> RU Cities/Mil
+            const targets = US_NATO_RETALIATION_TARGETS;
+
+            for (let i = 0; i < targets.length; i++) {
+                const origin = (i < 30) ? US_ATLANTIC_SUBS[i % 3] : EU_LAUNCH[i % 2];
+                const target = targets[i];
+
+                const m = this.launchMissile(origin, target, '#0088FF', 12000 + Math.random() * 3000, true);
+                this.attemptIntercept(m, 'RU');
+            }
+        });
+
+        // Phase 6: China "Dragon Wakes" (T+32s) - SPECIFIC TARGETS
+        this.schedule(32000, () => {
+            // Specific Pacific Targets
+            const targets = CN_PACIFIC_TARGETS;
+            for (let i = 0; i < targets.length; i++) {
+                const origin = CN_LAUNCH[i % 2];
+                const target = targets[i];
+                const m = this.launchMissile(origin, target, '#FF9900', 12000 + Math.random() * 3000, true);
+
+                this.attemptUserIntercept(m); // PROTECT PLAYER
+
+                // Regional Defense
+                if (target.lat > 30 && target.lng > 130 && target.lng < 145) {
+                    this.attemptIntercept(m, 'JP'); // Defend Japan
+                } else {
+                    this.attemptIntercept(m, 'US'); // US defends others (Aus/US)
+                }
+            }
+        });
+
+        // Phase 7: US Pacific Retaliation (T+37s)
+        this.schedule(37000, () => {
+            // Pacific Subs -> CN
+            const targets = CN_TARGETS;
+            for (let i = 0; i < targets.length; i++) {
+                const origin = US_PACIFIC_SUBS[i % 3];
+                const target = targets[i];
+                this.launchMissile(origin, target, '#0088FF', 10000 + Math.random() * 2000, true);
+            }
+        });
+
+        // Phase 8: Regional Conflicts (T+40s)
+        this.schedule(40000, () => {
+            // INDIA (4 Missiles) -> PAKISTAN Cities
+            for (let i = 0; i < 4; i++) {
+                const origin = INDIA_LAUNCH[0];
+                const target = REGIONAL_TARGETS.INDIA[i % REGIONAL_TARGETS.INDIA.length];
+                this.launchMissile(origin, target, '#FF8800', 4000 + Math.random() * 2000, true);
+            }
+            // PAKISTAN (7 Missiles) -> INDIA Cities
+            for (let i = 0; i < 7; i++) {
+                const origin = PAKISTAN_LAUNCH[0];
+                const target = REGIONAL_TARGETS.PAKISTAN[i % REGIONAL_TARGETS.PAKISTAN.length];
+                this.launchMissile(origin, target, '#00FF88', 4000 + Math.random() * 2000, true);
+            }
+            // ISRAEL (10) -> IRAN
+            for (let i = 0; i < 10; i++) {
+                const origin = ISRAEL_LAUNCH[0];
+                const target = REGIONAL_TARGETS.ISRAEL[i % REGIONAL_TARGETS.ISRAEL.length]; // Targeting Iran
+                this.launchMissile(origin, target, '#0088FF', 5000, true);
+            }
+            // IRAN (10) -> Israel
+            for (let i = 0; i < 10; i++) {
+                const origin = IRAN_LAUNCH[0];
+                const target = REGIONAL_TARGETS.IRAN[i % REGIONAL_TARGETS.IRAN.length]; // Targeting Israel
+                this.launchMissile(origin, target, '#CC00FF', 5000, true);
+            }
+        });
+
+        // Finale: Last Shot (T+48s)
+        this.schedule(48000, () => {
+            this.activeMissiles.forEach(m => m.remove());
+            // Keep detonations (scars) on screen
+
+            const origin = { lat: 88, lng: 0 };
+            const ms = this.launchMissile(origin, this.userLocation, '#FFFFFF', 6000, false);
+            // BOOST VISIBILITY
+            ms.dashedLine.setOptions({
+                zIndex: 999999,
+                strokeWeight: 4,
+                icons: [{
+                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 4, strokeColor: '#FFFFFF' },
+                    offset: '0',
+                    repeat: '20px'
+                }]
+            });
+            ms.solidLine.setOptions({ zIndex: 999999, strokeWeight: 5 });
+
+            // NO PROTECTION FOR THIS ONE - User dies here.
+
+            setTimeout(() => {
+                this.detonate(this.userLocation, 2000000, '#FFFFFF');
+                setTimeout(() => this.triggerGameOver(), 500);
+            }, 6000);
+        });
+    }
+}
+
+class Missile {
+    constructor(map, origin, target, color, duration) {
+        this.map = map;
+        this.origin = origin;
+        this.target = target;
+        this.color = color;
+        this.duration = duration;
+        this.startTime = null;
+        this.dashedLine = null;
+        this.solidLine = null;
+        this.animationFrame = null;
+        this.onImpact = null;
+        this.destroyed = false; // Destroyed mid-flight?
+    }
+
+    launch() {
+        // 1. Dashed "Tail" Trail
+        const dashSymbol = {
+            path: 'M 0,-1 0,1',
+            strokeOpacity: 1,
+            scale: 2
+        };
+
+        this.dashedLine = new google.maps.Polyline({
+            map: this.map,
+            geodesic: true,
+            strokeColor: this.color,
+            strokeOpacity: 0,
+            strokeWeight: 2,
+            zIndex: 200, // Higher than detonations
+            icons: [{
+                icon: dashSymbol,
+                offset: '0',
+                repeat: '10px'
+            }],
+            path: [this.origin, this.origin]
+        });
+
+        // 2. Solid "Head" Trail + Warhead
+        const warheadSymbol = {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 5,
+            fillColor: this.color, // Filled circle
+            fillOpacity: 1,
+            strokeWeight: 0,
+            strokeColor: '#FFF' // White outline?
+        };
+
+        this.solidLine = new google.maps.Polyline({
+            map: this.map,
+            geodesic: true,
+            strokeColor: this.color,
+            strokeOpacity: 1.0,
+            strokeWeight: 3,
+            zIndex: 201, // Top of missiles
+            path: [this.origin, this.origin],
+            icons: [{
+                icon: warheadSymbol,
+                offset: '100%' // At the very front
+            }]
+        });
+
+        this.startTime = performance.now();
+        this.animate();
+    }
+
+    animate() {
+        this.animationFrame = requestAnimationFrame((now) => {
+            if (this.destroyed) return; // Stop if destroyed
+
+            const elapsed = now - this.startTime;
+            const progress = Math.min(elapsed / this.duration, 1.0);
+
+            // Calculate current positions
+            const headPos = google.maps.geometry.spherical.interpolate(
+                new google.maps.LatLng(this.origin),
+                new google.maps.LatLng(this.target),
+                progress
+            );
+
+            // Solid Tail: 12% behind head (increased from 5%)
+            const solidTailProgress = Math.max(0, progress - 0.12);
+            /* const solidTailPos = ... */ // Optimization: calculate only if needed? JS is fast enough.
+            const solidTailPos = google.maps.geometry.spherical.interpolate(
+                new google.maps.LatLng(this.origin),
+                new google.maps.LatLng(this.target),
+                solidTailProgress
+            );
+
+            // Dashed Tail: 30% behind head
+            const dashedTailProgress = Math.max(0, progress - 0.3);
+            const dashedTailPos = google.maps.geometry.spherical.interpolate(
+                new google.maps.LatLng(this.origin),
+                new google.maps.LatLng(this.target),
+                dashedTailProgress
+            );
+
+            // Update Paths
+            this.solidLine.setPath([solidTailPos, headPos]);
+            this.dashedLine.setPath([dashedTailPos, solidTailPos]);
+
+            if (progress < 1.0) {
+                this.animate();
+            } else {
+                if (this.onImpact) this.onImpact();
+                this.remove();
+            }
+        });
+    }
+
+    destroy() {
+        this.destroyed = true;
+        this.remove();
+        // Do not call onImpact
+    }
+
+    remove() {
+        if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+        if (this.dashedLine) this.dashedLine.setMap(null);
+        if (this.solidLine) this.solidLine.setMap(null);
+    }
+}
+
+class Detonation {
+    constructor(map, center, maxSize, color) {
+        this.map = map;
+        this.center = center;
+        this.maxSize = maxSize;
+        this.color = color;
+        this.circle = null;
+        this.animationFrame = null;
+    }
+
+    explode() {
+        this.circle = new google.maps.Circle({
+            map: this.map,
+            strokeWeight: 0,
+            fillColor: this.color,
+            fillOpacity: 0.9,
+            center: this.center,
+            radius: 0,
+            zIndex: 10 // Ground level
+        });
+
+        // Animation
+        let size = 0;
+        const expandTime = 500;
+        const holdTime = 2000;
+        const fadeTime = 2000;
+        const startTime = Date.now();
+
+        // Permanent if RED (Nuclear), Fade if WHITE/GOLD/Cyan (Interceptor)
+        const isPermanent = (this.color === '#FF0000');
+
+        const animate = () => {
+            const now = Date.now();
+            const elapsed = now - startTime;
+
+            if (elapsed < expandTime) {
+                // Expanding
+                const progress = elapsed / expandTime;
+                size = this.maxSize * Math.pow(progress, 0.5);
+                this.circle.setRadius(size);
+                requestAnimationFrame(animate);
+            } else if (isPermanent) {
+                // Permanent Hold
+                this.circle.setRadius(this.maxSize);
+                // No fade for nukes
+            } else {
+                // Interceptor Fade Logic
+                if (elapsed < expandTime + holdTime) {
+                    // Holding
+                    this.circle.setRadius(this.maxSize);
+                } else if (elapsed < expandTime + holdTime + fadeTime) {
+                    // Fading
+                    const fadeElapsed = elapsed - (expandTime + holdTime);
+                    const p = 1 - (fadeElapsed / fadeTime);
+                    this.circle.setOptions({ fillOpacity: 0.9 * p });
+                } else {
+                    // Done
+                    this.remove();
+                    return;
+                }
+                requestAnimationFrame(animate);
+            }
+        };
+
+        animate();
+    }
+
+    remove() {
+        if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+        if (this.circle) this.circle.setMap(null);
+    }
+}
+
+function updateDefcon(level) {
+    const el = document.getElementById('defcon-display');
+    if (!el) return;
+
+    el.textContent = `DEFCON ${level}`;
+    el.className = ''; // Reset classes
+
+    if (level === 5) {
+        el.classList.add('defcon-5');
+    }
 }

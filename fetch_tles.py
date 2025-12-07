@@ -1,6 +1,7 @@
 import urllib.request
 import json
 import os
+import ssl
 
 # Configuration
 SATELLITE_IDS = ["48268", "49070"]
@@ -20,8 +21,6 @@ It runs as part of a GitHub Action workflow (or manually) to:
 This "Backend-for-Frontend" approach avoids CORS issues and API rate limits
 by serving static JSON files to the client.
 """
-
-import ssl
 
 def fetch_tles():
     """
