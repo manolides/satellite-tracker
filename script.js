@@ -723,7 +723,7 @@ async function handlePrediction() {
     // Secret Code Trigger
     // Secret Code Trigger
     const inputUpper = locationInput.trim().toUpperCase();
-    if (inputUpper === "JOSHUA" || inputUpper === "WOPR" || inputUpper === "WOPR1" || inputUpper === "WOPR1L") {
+    if (inputUpper === "JOSHUA" || inputUpper === "WOPR" || inputUpper === "WOPR1") {
 
         if (inputUpper === "JOSHUA" && window.isWarGamesMode) {
             exitWarGamesMode();
@@ -733,7 +733,6 @@ async function handlePrediction() {
 
         let scenario = 0; // Default to 0 (Style Only / JOSHUA)
         if (inputUpper === "WOPR" || inputUpper === "WOPR1") scenario = 1;
-        if (inputUpper === "WOPR1L") scenario = 4; // Long/Real-time
 
         toggleWarGamesMode(scenario);
         document.getElementById('locationInput').value = ""; // Clear input
@@ -1678,8 +1677,8 @@ class ScenarioManager {
             this.userLocation = await this.fetchUserLocation();
         }
 
-        if (id === 1) this.runScenario1(false);
-        else if (id === 4) this.runScenario1(true); // Realistic
+        if (id === 1) this.runScenario1();
+        else if (id === 4) this.runScenario1(); // Realistic
         else if (id === 2) console.log("Scenario 2 not implemented");
         else if (id === 3) console.log("Scenario 3 not implemented");
     }
@@ -1743,7 +1742,7 @@ class ScenarioManager {
     }
 
     // New: GBI Intercept Logic
-    attemptIntercept(incomingMissile, defender, isRealTime = false, gbiSpeedMph = 17000, leadTimeMs = 0) {
+    attemptIntercept(incomingMissile, defender, gbiSpeedMph = 17000, leadTimeMs = 2000) {
         // Check Limits
         if (!this.gbiCounts) this.gbiCounts = { 'US': 10, 'RU': 10, 'EU': 5, 'JP': 5 };
         if (this.gbiCounts[defender] <= 0) return; // Out of ammo
@@ -1754,61 +1753,8 @@ class ScenarioManager {
         // 35% chance of success (Simulation)
         const isSuccess = Math.random() < 0.35;
 
-        // REAL TIME LOGIC
-        if (isRealTime) {
-            // "GBIs fire at incoming nukes when they're 50% to targets"
-            const flightTime = incomingMissile.duration;
-            const launchDelay = flightTime * 0.5;
-
-            // Calculate delay relative to NOW
-            // We are called at launch (Start). 
-            // So we wait launchDelay ms.
-
-            const delay = launchDelay; // relative to now if called at launch
-
-            setTimeout(() => {
-                if (!this.isRunning || incomingMissile.destroyed) return;
-
-                // ... Launch GBI Logic
-                // Pick Launch Site
-                let sites = [];
-                if (defender === 'US') sites = [{ lat: 63.9, lng: -145.7 }, { lat: 34.7, lng: -120.6 }, { lat: 43.9, lng: -75.6 }];
-                else if (defender === 'RU') sites = [{ lat: 55.7, lng: 37.6 }, { lat: 46.0, lng: 73.0 }, { lat: 53.0, lng: 158.0 }];
-                else if (defender === 'EU') sites = [{ lat: 54.3, lng: -0.6 }, { lat: 44.0, lng: 24.3 }];
-                else if (defender === 'JP') sites = [{ lat: 40.9, lng: 140.3 }, { lat: 35.7, lng: 135.2 }];
-
-                // Find nearest
-                let bestSite = sites[0];
-                let minDist = Infinity;
-                const tLat = incomingMissile.target.lat;
-                const tLng = incomingMissile.target.lng;
-                sites.forEach(site => {
-                    const d = Math.abs(site.lat - tLat) + Math.abs(site.lng - tLng);
-                    if (d < minDist) { minDist = d; bestSite = site; }
-                });
-
-                // Calculate Interceptor Duration (Physics)
-                // GBI Speed is passed in (should be 120% of ICBM)
-                const gbiDur = this.calculateFlightDuration(bestSite, incomingMissile.target, gbiSpeedMph);
-
-                const interceptor = this.launchMissile(bestSite, incomingMissile.target, '#FFFFFF', gbiDur, false);
-
-                setTimeout(() => {
-                    if (!this.isRunning) return;
-                    interceptor.destroy();
-                    this.detonate(incomingMissile.target, 150000, '#FFFFFF');
-                    if (isSuccess) incomingMissile.destroy();
-                }, gbiDur);
-
-            }, delay);
-
-            return;
-        }
-
-        // --- FAST MODE LOGIC (Updated to match request) ---
-        // "GBIs fire ... when they're 50% to targets"
-        // Intercept at 50% of flight path
-        const interceptRatio = 0.5;
+        // Standard "Fast Mode" Intercept Logic
+        const interceptRatio = 0.5; // Intercept at 50% of flight path
 
         // Calculate coordinate
         const interceptPos = google.maps.geometry.spherical.interpolate(
@@ -1818,7 +1764,7 @@ class ScenarioManager {
         );
 
         // Detection Logic (Delay launch)
-        const detectionTime = leadTimeMs || 2000; // Use parameter if passed, else 2000
+        const detectionTime = leadTimeMs; // Use parameter if passed, else 2000
 
         setTimeout(() => {
             if (!this.isRunning || incomingMissile.destroyed) return;
@@ -1897,8 +1843,8 @@ class ScenarioManager {
         }, reactionDelay);
     }
 
-    launchMissile(origin, target, color, speedMs, detonateOnImpact = true) {
-        const missile = new Missile(this.map, origin, target, color, speedMs);
+    launchMissile(origin, target, color, duration, detonateOnImpact = true) {
+        const missile = new Missile(this.map, origin, target, color, duration);
         this.activeMissiles.push(missile);
         missile.onImpact = () => {
             if (detonateOnImpact && !missile.destroyed) {
@@ -1948,26 +1894,26 @@ class ScenarioManager {
     }
 
     // --- SCENARIO 1: HOUSE OF DYNAMITE (GLOBAL WAR) ---
-    runScenario1(isRealTime = false) {
+    runScenario1() {
         // Configuration
         const ICBM_SPEED = 15000; // mph
         const GBI_SPEED = ICBM_SPEED * 1.2; // 120% of ICBM Speed
 
+        // Helper to get consistent physics duration or fallback
         const getDuration = (origin, target, defaultDur) => {
-            if (isRealTime) return this.calculateFlightDuration(origin, target, ICBM_SPEED);
             return defaultDur;
         };
 
         // Reset GBIs (Increased counts)
         this.gbiCounts = { 'US': 15, 'RU': 15, 'EU': 7, 'JP': 5 };
 
-        // Helper wrapper for launch to use duration logic
+        // Helper wrapper for launch
         const launch = (org, tgt, col, defDur, impact) => {
             const dur = getDuration(org, tgt, defDur);
             return this.launchMissile(org, tgt, col, dur, impact);
         };
 
-        // --- COORDINATES (DETAILED) ---
+        // --- COORDINATES ---
         const ARCTIC = { lat: 80, lng: -90 };
         const CHICAGO = { lat: 41.8781, lng: -87.6298 };
         const FT_GREELY = { lat: 63.9, lng: -145.7 };
@@ -1975,16 +1921,12 @@ class ScenarioManager {
 
         // LAUNCH SITES
         const SILO_BELT = [{ lat: 47.5, lng: -111.0 }, { lat: 48.0, lng: -101.0 }, { lat: 41.0, lng: -104.0 }];
-        // Updated User Coordinates
         const US_ATLANTIC_SUBS = [{ lat: 46.57, lng: -32.84 }];
         const US_PACIFIC_SUBS = [{ lat: 12.30, lng: 135.48 }, { lat: 29.48, lng: 139.65 }];
-
         const RU_LAUNCH = [{ lat: 51.09, lng: 59.83 }, { lat: 62.92, lng: 40.57 }]; // Dombarovsky, Plesetsk
         const RU_SUBS = [{ lat: 69.25, lng: 33.32 }, { lat: 52.92, lng: 158.42 }]; // Gadzhiyevo, Rybachiy (Generic)
-        // Updated User Coordinates
         const RU_ATLANTIC_FLEET = [{ lat: 25.85, lng: -64.45 }, { lat: 36.91, lng: -49.86 }];
         const RU_PACIFIC_FLEET = [{ lat: 50.45, lng: -144.01 }, { lat: 19.93, lng: -129.00 }];
-
         const CN_LAUNCH = [{ lat: 34.7, lng: 112.0 }, { lat: 26.5, lng: 104.0 }]; // DF-41 Fields (Rough)
         const EU_LAUNCH = [{ lat: 48.30, lng: -4.50 }, { lat: 56.06, lng: -4.82 }]; // Ile Longue, Faslane
 
@@ -2129,19 +2071,18 @@ class ScenarioManager {
 
         // --- TIMING LOGIC ---
         // Fast Mode: Fixed sequence (T+5s, T+8s, etc).
-        // Real Mode: User Defined Physics Timeline.
 
-        console.log(`Scenario 1 Started (RealTime: ${isRealTime})`);
+        console.log(`Scenario 1 Started (Fast Mode)`);
         this.updateDefcon(5);
 
         // --- PHASE 1: THE TRIGGER (Arctic -> Chicago) ---
-        const t1_delay = isRealTime ? 60000 : 5000; // T+1m
+        const t1_delay = 5000; // T+5s
         let p1_flightDur = 0;
 
-        // Define Lead Times for RealTime
-        const LEAD_US = 10 * 60000; // 10 mins
-        const LEAD_RU = 10 * 60000; // 10 mins
-        const LEAD_ALLIES = 5 * 60000; // 5 mins
+        // Define Lead Times
+        const LEAD_US = 2000;
+        const LEAD_RU = 2000;
+        const LEAD_ALLIES = 2000;
 
         this.schedule(t1_delay, () => {
             try {
@@ -2158,19 +2099,12 @@ class ScenarioManager {
                     0.5 // Mid-course intercept
                 );
 
-                // FIX: Calculate generic fast duration if not RealTime
-                let gbiDur;
-                if (isRealTime) {
-                    gbiDur = this.calculateFlightDuration(FT_GREELY, interceptPoint, GBI_SPEED);
-                } else {
-                    // Fast Mode: p1_flightDur is 15000. 
-                    // GBI should be fast. Let's say 4000ms to intercept quickly.
-                    gbiDur = 4000;
-                }
+                // FIX: Calculate generic fast duration
+                let gbiDur = 4000;
 
                 const launchDelay = (p1_flightDur * 0.5);
                 // We fire exactly when missile is at 50% (7.5s in Fast Mode).
-                // GBI takes 4s. 
+                // GBI takes 4s.
                 // It arrives at T+11.5s. Missile impact at T+15s.
                 // It will chase and "miss" (fail script).
 
@@ -2200,32 +2134,31 @@ class ScenarioManager {
                 // Timing: When nuke is 50% there.
                 const triggerTime = p1_flightDur * 0.5;
                 fireFailedGBI(triggerTime);
-                fireFailedGBI(triggerTime + (isRealTime ? 2000 : 500)); // 2nd one shortly after
+                fireFailedGBI(triggerTime + 500); // 2nd one shortly after
 
             } catch (e) { console.error("Phase 1 Crash:", e); }
         });
 
         // Determine P1 impact time for scheduling subsequent events
-        // Note: In !isRealTime, these variables are just placeholders for the fixed schedule below.
-        const dummyP1Dur = isRealTime ? this.calculateFlightDuration(ARCTIC, CHICAGO, ICBM_SPEED) : 15000;
+        const dummyP1Dur = 15000;
         const t1_impact = t1_delay + dummyP1Dur;
 
         // --- PHASE 3: US RETALIATION ---
         // "US launches 1 minute before impact" (of Phase 1)
-        const t3_launch = isRealTime ? (t1_impact - 60000) : 18000;
+        const t3_launch = 18000;
 
         this.schedule(t3_launch, () => {
             try {
                 console.log("Phase 3: US Launch Executing. Targets:", US_FIRST_STRIKE_TARGETS ? US_FIRST_STRIKE_TARGETS.length : "UNDEFINED");
                 this.updateDefcon(1);
                 const targets = US_FIRST_STRIKE_TARGETS;
-                const lead = isRealTime ? LEAD_RU : 2000;
+                const lead = 2000;
 
                 targets.forEach((target, i) => {
                     const origin = SILO_BELT[i % SILO_BELT.length];
                     setTimeout(() => {
                         const m = launch(origin, target, '#0088FF', 10000 + Math.random() * 2000, true);
-                        this.attemptIntercept(m, 'RU', isRealTime, GBI_SPEED, lead);
+                        this.attemptIntercept(m, 'RU', GBI_SPEED, lead);
                     }, Math.random() * 5000);
                 });
             } catch (e) { console.error("Phase 3 Crash:", e); }
@@ -2234,11 +2167,11 @@ class ScenarioManager {
         // --- PHASE 4: RUSSIA LAUNCH ---
         // Mainland: 10 mins later (than US Launch)
         // Subs: 5 mins later (than US Launch)
-        const t4a_subs = isRealTime ? (t3_launch + 5 * 60000) : 25000;
-        const t4b_main = isRealTime ? (t3_launch + 10 * 60000) : 30000; // Staggered in fast mode
+        const t4a_subs = 25000;
+        const t4b_main = 30000; // Staggered in fast mode
 
-        const ru_lead = isRealTime ? LEAD_US : 2000;
-        const eu_lead = isRealTime ? LEAD_ALLIES : 2000;
+        const ru_lead = 2000;
+        const eu_lead = 2000;
 
         // Subs Launch
         this.schedule(t4a_subs, () => {
@@ -2255,7 +2188,7 @@ class ScenarioManager {
                 const fire = (tgts, origins) => {
                     tgts.forEach((t, i) => {
                         const m = launch(origins[i % origins.length], t, '#FF0000', 15000, true);
-                        this.attemptIntercept(m, 'US', isRealTime, GBI_SPEED, ru_lead);
+                        this.attemptIntercept(m, 'US', GBI_SPEED, ru_lead);
                     });
                 };
 
@@ -2277,7 +2210,7 @@ class ScenarioManager {
                         let lead = ru_lead;
                         if (t.lng > -30 && t.lng < 40) { def = 'EU'; lead = eu_lead; }
 
-                        this.attemptIntercept(m, def, isRealTime, GBI_SPEED, lead);
+                        this.attemptIntercept(m, def, GBI_SPEED, lead);
                     }, Math.random() * 10000);
                 });
             } catch (e) { console.error("Phase 4b Crash:", e); }
@@ -2285,7 +2218,7 @@ class ScenarioManager {
 
         // --- PHASE 6: CHINA ---
         // "China launches 10 minutes later" (Assuming after RU Mainland)
-        const t6_cn = isRealTime ? (t4b_main + 10 * 60000) : 32000;
+        const t6_cn = 32000;
 
         this.schedule(t6_cn, () => {
             console.log("Phase 6: China Launch");
@@ -2294,21 +2227,13 @@ class ScenarioManager {
                 const m = launch(CN_LAUNCH[i % 2], t, '#FF9900', 12000, true);
                 let def = 'US';
                 let lead = ru_lead;
-                if (t.lat > 30 && t.lng > 120 && t.lng < 150) { def = 'JP'; lead = isRealTime ? LEAD_ALLIES : 2000; }
-                this.attemptIntercept(m, def, isRealTime, GBI_SPEED, lead);
+                if (t.lat > 30 && t.lng > 120 && t.lng < 150) { def = 'JP'; lead = 2000; }
+                this.attemptIntercept(m, def, GBI_SPEED, lead);
             });
         });
 
-        // Phase 7: US Pacific Retaliation (T+37s)
-        // This phase was removed from the user's new timeline.
-        // I will re-add it here, but commented out, as it was part of the original scenario.
-        // If the user explicitly wanted it removed, they would have specified.
-        // For now, I'll assume the provided snippet was an *addition* to the timeline logic, not a full replacement.
-        // However, the instruction was "Update runScenario3 timeline logic", and the provided code *is* a new timeline.
-        // So I will remove the old Phase 7.
-
         // Phase 8: Regional Conflicts
-        const t8_pk = isRealTime ? (t6_cn + 2 * 60000) : 40000;
+        const t8_pk = 40000;
         this.schedule(t8_pk, () => {
             console.log("Phase 8: Regional Conflicts Launch");
             REGIONAL_TARGETS.INDIA.forEach((t) => launch(PAKISTAN_LAUNCH[0], t, '#00FF00', 5000, true));
@@ -2327,12 +2252,12 @@ class ScenarioManager {
         });
 
         // Finale: Last Shot (T+48s)
-        this.schedule(isRealTime ? (t6_cn + 300000) : 48000, () => { // +5 mins after China's launch
+        this.schedule(48000, () => { // +5 mins after China's launch
             // this.activeMissiles.forEach(m => m.remove()); // Don't clear missiles, keep chaos visible
             // Keep detonations (scars) on screen
 
             const origin = { lat: 88, lng: 0 };
-            const dur = isRealTime ? this.calculateFlightDuration(origin, this.userLocation, ICBM_SPEED) : 6000;
+            const dur = 6000;
             const ms = this.launchMissile(origin, this.userLocation, '#FFFFFF', dur, false);
             // BOOST VISIBILITY
             ms.dashedLine.setOptions({
@@ -2348,7 +2273,7 @@ class ScenarioManager {
 
             // NO PROTECTION FOR THIS ONE - User dies here.
 
-            const delay = isRealTime ? dur : 6000;
+            const delay = 6000;
 
             setTimeout(() => {
                 this.detonate(this.userLocation, 2000000, '#FFFFFF');
