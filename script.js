@@ -2328,7 +2328,7 @@ class ScenarioManager {
 
         // Finale: Last Shot (T+48s)
         this.schedule(isRealTime ? (t6_cn + 300000) : 48000, () => { // +5 mins after China's launch
-            this.activeMissiles.forEach(m => m.remove());
+            // this.activeMissiles.forEach(m => m.remove()); // Don't clear missiles, keep chaos visible
             // Keep detonations (scars) on screen
 
             const origin = { lat: 88, lng: 0 };
