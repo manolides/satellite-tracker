@@ -23,6 +23,10 @@ let satellites = [
     { name: "PLEIADES NEO 4", catNr: 49070, marker: null, satrec: null, pastPath: null, futurePath: null, cones: [] }
 ];
 
+// Solar Angle State
+let isSolarDateCustom = false;
+let customSolarDate = null;
+
 const SATELLITE_ICON_PATH = "M2 9l-2-2 4-4 2 2-4 4zm2-2l6-6 2 2-6 6-2-2zm-2 2l-2 2 4 4 2-2-4-4zm11-11l2-2 4 4-2 2-4-4zm-2 2l6 6-2 2-6-6 2-2z";
 // A simple satellite shape: body and solar panels
 const SATELLITE_SVG = {
@@ -166,27 +170,74 @@ function initMap() {
     }
 
     const toggleSolar = document.getElementById('toggleSolar');
+    const solarDateControls = document.getElementById('solar-date-controls');
+    const solarDateInput = document.getElementById('solarDateInput');
+    const solarDateReset = document.getElementById('solarDateReset');
+
     if (toggleSolar) {
+        // Initialize Date Input to Today
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (solarDateInput) solarDateInput.value = todayStr;
+
         toggleSolar.addEventListener('change', function () {
             console.log('Toggle clicked. Checked:', this.checked);
             if (this.checked) {
-                solarAngleLayer.setMap(map);
+                if (isSolarDateCustom && customSolarDate) {
+                    updateSolarAngleLayer(customSolarDate);
+                } else {
+                    // Will be updated by loop, but ensure it's on
+                    solarAngleLayer.setMap(map);
+                }
                 console.log('Layer set to map');
             } else {
                 solarAngleLayer.setMap(null);
                 console.log('Layer removed from map');
             }
 
-            // Toggle Legend Visibility
+            // Toggle Legend and Date Controls Visibility
             const sunLegend = document.getElementById('sun-legend');
             if (sunLegend) {
                 sunLegend.style.display = this.checked ? 'block' : 'none';
+            }
+            if (solarDateControls) {
+                solarDateControls.style.display = this.checked ? 'flex' : 'none'; // Flex for layout
             }
 
             // Also toggle the marginal layer if it exists
             if (window.marginalSolarLayer) {
                 window.marginalSolarLayer.setVisible(this.checked);
             }
+        });
+    }
+
+    if (solarDateInput) {
+        solarDateInput.addEventListener('change', (e) => {
+            const dateStr = e.target.value;
+            if (dateStr) {
+                isSolarDateCustom = true;
+                // Create date at noon UTC to ensure stable declination for the day
+                customSolarDate = new Date(dateStr + 'T12:00:00Z');
+                updateSolarAngleLayer(customSolarDate);
+
+                // Change button text to indicate non-live
+                if (solarDateReset) solarDateReset.style.fontWeight = "bold";
+            }
+        });
+    }
+
+    if (solarDateReset) {
+        solarDateReset.addEventListener('click', () => {
+            isSolarDateCustom = false;
+            customSolarDate = null;
+
+            // Reset input to today
+            const todayStr = new Date().toISOString().split('T')[0];
+            solarDateInput.value = todayStr;
+
+            // Immediately update to now
+            updateSolarAngleLayer(new Date());
+
+            if (solarDateReset) solarDateReset.style.fontWeight = "normal";
         });
     }
 
@@ -271,8 +322,18 @@ function createVisuals(sat) {
             map: map,
             geodesic: true,
             strokeColor: '#FFFF00', // Yellow for past
-            strokeOpacity: 0.5,
-            strokeWeight: 2
+            strokeOpacity: 0, // Transparent main line
+            icons: [{
+                icon: {
+                    path: 'M 0,-1 0,1', // Line segment
+                    strokeOpacity: 1,
+                    scale: 3, // Length of dash
+                    strokeWeight: 1, // Thinner than forward path
+                    strokeColor: '#FFFF00'
+                },
+                offset: '0',
+                repeat: '15px' // Spacing + Dash length
+            }]
         });
     }
 
@@ -363,7 +424,12 @@ function updatePositions() {
     const now = new Date();
 
     updateNightLayer(now);
-    updateSolarAngleLayer(now);
+
+    if (isSolarDateCustom && customSolarDate) {
+        updateSolarAngleLayer(customSolarDate);
+    } else {
+        updateSolarAngleLayer(now);
+    }
 
     satellites.forEach(sat => {
         if (!sat.satrec) return;
@@ -396,7 +462,7 @@ function updatePositions() {
         // Update Tracks
         // Calculate past track (last 90 mins)
         const pastPathCoords = [];
-        for (let i = -90; i <= 0; i += 2) { // Every 2 minutes
+        for (let i = -30; i <= 0; i += 2) { // Every 2 minutes
             const t = new Date(now.getTime() + i * 60000);
             const pos = getLatLngAtTime(sat.satrec, t);
             if (pos) pastPathCoords.push(pos);

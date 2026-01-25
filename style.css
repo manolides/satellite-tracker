@@ -200,7 +200,7 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
 /* Legend Container */
 #legends-container {
     position: absolute;
-    bottom: 80px;
+    bottom: 110px;
     /* Above controls */
     left: 10px;
     display: flex;
@@ -670,4 +670,14 @@ body.wopr-simulation #nasa-attribution {
 
 .screen-flutter {
     animation: flutter 0.2s ease-in-out 2;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.control-row label {
+    margin-bottom: 0;
 }

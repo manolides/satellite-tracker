@@ -43,7 +43,14 @@
     <div id="map"></div>
     <div id="branding">AIRBUS PLEIADES NEO</div>
     <div id="controls">
-        <label><input type="checkbox" id="toggleSolar"> Poor Sun Angle</label>
+        <div class="control-row">
+            <label><input type="checkbox" id="toggleSolar"> Poor Sun Angle</label>
+            <div id="solar-date-controls" style="display: none; margin-left: 10px;">
+                <input type="date" id="solarDateInput" style="font-family: inherit; font-size: 12px;">
+                <button id="solarDateReset"
+                    style="font-family: inherit; font-size: 12px; cursor: pointer;">Live</button>
+            </div>
+        </div>
         <label><input type="checkbox" id="toggleSnow"> Snow Cover</label>
         <label><input type="checkbox" id="toggleCloud"> Cloud Cover</label>
     </div>
