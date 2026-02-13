@@ -678,6 +678,77 @@ body.wopr-simulation #nasa-attribution {
     margin-bottom: 5px;
 }
 
-.control-row label {
-    margin-bottom: 0;
+
+/* Satellite Options Panel */
+#sat-options-panel {
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.sat-group {
+    margin-bottom: 10px;
+}
+
+.sat-group-title {
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 5px;
+    padding-bottom: 2px;
+}
+
+.sat-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: white;
+}
+
+.sat-item label {
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+.sat-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* WOPR Mode for Satellite Panel */
+body.wopr-mode #sat-options-panel {
+    background: rgba(0, 20, 20, 0.9);
+    border: 2px solid #00ffff;
+    border-radius: 0;
+    box-shadow: 0 0 10px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.2);
+    font-family: 'VT323', monospace;
+}
+
+body.wopr-mode #satOptionsBtn {
+    background: #000;
+    border: 1px solid #00ffff !important;
+    color: #00ffff !important;
+    font-family: 'VT323', monospace;
+    text-shadow: 0 0 2px #00ffff;
+    border-radius: 0;
+}
+
+body.wopr-mode #satOptionsBtn:hover {
+    background: #00ffff;
+    color: #000 !important;
+    box-shadow: 0 0 10px #00ffff;
+}
+
+body.wopr-mode #closeSatOptions {
+    color: #00ffff !important;
+    border: 1px solid #00ffff !important;
+    font-family: 'VT323', monospace;
+    text-shadow: 0 0 2px #00ffff;
+}
+
+body.wopr-mode #closeSatOptions:hover {
+    background: #00ffff !important;
+    color: #000 !important;
+    box-shadow: 0 0 5px #00ffff;
 }

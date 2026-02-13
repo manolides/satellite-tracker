@@ -4,7 +4,13 @@ import os
 import ssl
 
 # Configuration
-SATELLITE_IDS = ["48268", "49070"]
+SATELLITE_IDS = [
+    "48268", "49070",  # Pleiades Neo 3, 4
+    "40115",           # WorldView-3
+    "59625", "59626", "60452", "60453", "62900", "62901", # WorldView Legion 1-6
+    "52320", "52322", "63125", "63126", # SuperView Neo-1 01-04
+    "66820"            # Kompsat-7
+]
 BASE_URL = "https://celestrak.org/NORAD/elements/gp.php"
 OUTPUT_FILE = "satellites.json"
 

@@ -18,10 +18,7 @@ let nightLayer;
 let solarAngleLayer;
 let snowCoverLayer;
 let cloudCoverLayer;
-let satellites = [
-    { name: "PLEIADES NEO 3", catNr: 48268, marker: null, satrec: null, pastPath: null, futurePath: null, cones: [] },
-    { name: "PLEIADES NEO 4", catNr: 49070, marker: null, satrec: null, pastPath: null, futurePath: null, cones: [] }
-];
+let satellites = []; // Will be populated from JSON
 
 // Solar Angle State
 let isSolarDateCustom = false;
@@ -241,6 +238,23 @@ function initMap() {
         });
     }
 
+    // Initialize Satellite Options Panel
+    const satOptionsBtn = document.getElementById('satOptionsBtn');
+    const satOptionsPanel = document.getElementById('sat-options-panel');
+    const closeSatOptions = document.getElementById('closeSatOptions');
+
+    if (satOptionsBtn && satOptionsPanel) {
+        satOptionsBtn.addEventListener('click', () => {
+            satOptionsPanel.style.display = (satOptionsPanel.style.display === 'block') ? 'none' : 'block';
+        });
+    }
+
+    if (closeSatOptions && satOptionsPanel) {
+        closeSatOptions.addEventListener('click', () => {
+            satOptionsPanel.style.display = 'none';
+        });
+    }
+
     fetchTLEs();
 }
 
@@ -259,18 +273,32 @@ async function fetchTLEs() {
 
         const data = await response.json();
 
-        data.forEach(item => {
-            // Find the corresponding satellite object in our global array
-            const sat = satellites.find(s => s.catNr === item.catNr);
-            if (sat) {
-                sat.satrec = satellite.twoline2satrec(item.line1, item.line2);
+        // Populate global satellites array
+        satellites = data.map(item => {
+            // Determine if enabled by default (only Pleiades Neo)
+            const isDefault = item.name.includes("PLEIADES NEO");
+
+            return {
+                name: item.name,
+                catNr: item.catNr,
+                enabled: isDefault,
+                satrec: satellite.twoline2satrec(item.line1, item.line2),
+                marker: null,
+                pastPath: null,
+                futurePath: null,
+                cones: []
+            };
+        });
+
+        // Initialize visuals for enabled satellites
+        satellites.forEach(sat => {
+            if (sat.enabled) {
                 createVisuals(sat);
-            } else {
-                // console.warn(`Satellite ${item.name} (${item.catNr}) found in JSON but not in global config.`);
             }
         });
 
-
+        // Setup the Options UI
+        setupSatelliteOptionsUI();
 
     } catch (error) {
         console.error("Error loading satellites.json:", error);
@@ -279,6 +307,90 @@ async function fetchTLEs() {
         // This ensures day/night cycle and solar layers still work
         setInterval(updatePositions, 1000);
         updatePositions(); // Initial update
+    }
+}
+
+function setupSatelliteOptionsUI() {
+    const listContainer = document.getElementById('sat-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    // Group satellites
+    const groups = {};
+    satellites.forEach(sat => {
+        let groupName = "Other";
+        if (sat.name.includes("PLEIADES")) groupName = "Pleiades Neo";
+        else if (sat.name.includes("WORLDVIEW") || sat.name.includes("WV-")) groupName = "WorldView";
+        else if (sat.name.includes("LEGION")) groupName = "Legion";
+        else if (sat.name.includes("SUPERVIEW")) groupName = "SuperView";
+        else if (sat.name.includes("KOMPSAT")) groupName = "Kompsat";
+
+        if (!groups[groupName]) groups[groupName] = [];
+        groups[groupName].push(sat);
+    });
+
+    // Create UI elements
+    for (const [groupName, groupSats] of Object.entries(groups)) {
+        const groupDiv = document.createElement('div');
+        groupDiv.className = 'sat-group';
+
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'sat-group-title';
+        titleDiv.textContent = groupName;
+        groupDiv.appendChild(titleDiv);
+
+        groupSats.forEach(sat => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'sat-item';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.id = `sat-${sat.catNr}`;
+            checkbox.checked = sat.enabled;
+
+            checkbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                toggleSatellite(sat.catNr, isChecked);
+            });
+
+            const label = document.createElement('label');
+            label.htmlFor = `sat-${sat.catNr}`;
+            label.textContent = sat.name;
+
+            itemDiv.appendChild(checkbox);
+            itemDiv.appendChild(label);
+            groupDiv.appendChild(itemDiv);
+        });
+
+        listContainer.appendChild(groupDiv);
+    }
+}
+
+function toggleSatellite(catNr, enabled) {
+    const sat = satellites.find(s => s.catNr === catNr);
+    if (!sat) return;
+
+    sat.enabled = enabled;
+
+    if (enabled) {
+        // Create visuals if they don't exist
+        createVisuals(sat);
+
+        // Restore visibility for existing visuals
+        if (sat.marker) sat.marker.setMap(map);
+        if (sat.pastPath) sat.pastPath.setMap(map);
+        if (sat.futurePath) sat.futurePath.setMap(map);
+        sat.cones.forEach(cone => cone.setMap(map));
+
+        // Force an update immediately
+        updatePositions();
+    } else {
+        // Hide existing visuals
+        if (sat.marker) sat.marker.setMap(null);
+        if (sat.pastPath) sat.pastPath.setMap(null);
+        if (sat.futurePath) sat.futurePath.setMap(null);
+        sat.cones.forEach(cone => cone.setMap(null));
     }
 }
 
@@ -432,7 +544,7 @@ function updatePositions() {
     }
 
     satellites.forEach(sat => {
-        if (!sat.satrec) return;
+        if (!sat.satrec || !sat.enabled) return;
 
         // Update Marker
         const currentPos = getLatLngAtTime(sat.satrec, now);
@@ -868,7 +980,7 @@ async function handlePrediction() {
         // then combine and take the top 5 soonest.
 
         const promises = satellites.map(async sat => {
-            if (sat.satrec) {
+            if (sat.satrec && sat.enabled) {
                 return predictPasses(sat, coords, maxOffNadir, 5, 365); // Limit 5, Max 365 days
             }
             return [];

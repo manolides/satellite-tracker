@@ -51,8 +51,22 @@
                     style="font-family: inherit; font-size: 12px; cursor: pointer;">Live</button>
             </div>
         </div>
-        <label><input type="checkbox" id="toggleSnow"> Snow Cover</label>
-        <label><input type="checkbox" id="toggleCloud"> Cloud Cover</label>
+        <div class="control-row">
+            <label style="margin-right: 10px;"><input type="checkbox" id="toggleSnow"> Snow Cover</label>
+            <label style="margin-right: 10px;"><input type="checkbox" id="toggleCloud"> Cloud Cover</label>
+            <button id="satOptionsBtn"
+                style="font-family: inherit; font-size: 14px; cursor: pointer; background: rgba(0,0,0,0.5); color: #0f0; border: 1px solid #0f0; padding: 2px 5px;">Satellite
+                Options</button>
+        </div>
+        <div id="sat-options-panel"
+            style="display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 10px; background: rgba(0, 0, 0, 0.9); border: 1px solid #0f0; padding: 10px; z-index: 1000; max-height: 300px; overflow-y: auto; width: 200px;">
+            <h4 style="margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid #0f0;">Visible Satellites</h4>
+            <div id="sat-list">
+                <!-- Checkboxes will be generated here -->
+            </div>
+            <button id="closeSatOptions"
+                style="margin-top: 10px; font-family: inherit; font-size: 12px; cursor: pointer; background: transparent; color: #0f0; border: 1px solid #0f0;">Close</button>
+        </div>
     </div>
 
     <div id="prediction-panel">
