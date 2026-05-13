@@ -790,27 +790,34 @@ function getTerminatorPath(sunLat, sunLng) {
         latRad = latRad >= 0 ? 1e-6 : -1e-6;
     }
 
-    // Generate terminator points from West to East (-180 to 180)
-    for (let lng = -180; lng <= 180; lng += 2) {
-        const lngRad = lng * rad;
-        const sunLngRad = sunLng * rad;
-        
-        // Calculate the latitude of the terminator at this longitude
-        const termLatRad = Math.atan(-Math.cos(lngRad - sunLngRad) / Math.tan(latRad));
-        path.push({ lat: termLatRad * deg, lng: lng });
-    }
-
-    // Close the polygon based on the season (which pole is in darkness)
     if (sunLat > 0) {
-        // Northern hemisphere summer -> sun in North -> night in South
-        // Close around the South Pole
+        // Night is in the South.
+        // Top edge: Terminator from West to East (-180 to 180)
+        for (let lng = -180; lng <= 180; lng += 2) {
+            const lngRad = lng * rad;
+            const sunLngRad = sunLng * rad;
+            const termLatRad = Math.atan(-Math.cos(lngRad - sunLngRad) / Math.tan(latRad));
+            path.push({ lat: termLatRad * deg, lng: lng });
+        }
+        // Right edge: Down to South Pole
         path.push({ lat: -90, lng: 180 });
+        // Bottom edge: East to West along South Pole. Split at 0 to prevent 360-degree wrapping bugs.
+        path.push({ lat: -90, lng: 0 });
         path.push({ lat: -90, lng: -180 });
     } else {
-        // Northern hemisphere winter -> sun in South -> night in North
-        // Close around the North Pole
-        path.push({ lat: 90, lng: 180 });
+        // Night is in the North.
+        // Bottom edge: Terminator from East to West (180 to -180)
+        for (let lng = 180; lng >= -180; lng -= 2) {
+            const lngRad = lng * rad;
+            const sunLngRad = sunLng * rad;
+            const termLatRad = Math.atan(-Math.cos(lngRad - sunLngRad) / Math.tan(latRad));
+            path.push({ lat: termLatRad * deg, lng: lng });
+        }
+        // Left edge: Up to North Pole
         path.push({ lat: 90, lng: -180 });
+        // Top edge: West to East along North Pole. Split at 0 to prevent 360-degree wrapping bugs.
+        path.push({ lat: 90, lng: 0 });
+        path.push({ lat: 90, lng: 180 });
     }
 
     return path;
