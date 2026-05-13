@@ -780,35 +780,37 @@ function getSunPosition(date) {
 }
 
 function getTerminatorPath(sunLat, sunLng) {
-    // We want the night side.
-    // The night center is opposite to the sun.
-    const nightLat = -sunLat;
-    let nightLng = sunLng + 180;
-    if (nightLng > 180) nightLng -= 360;
-
-    return getCirclePath(nightLat, nightLng, 90);
-}
-
-function getCirclePath(centerLat, centerLng, radiusDeg) {
+    const path = [];
     const rad = Math.PI / 180;
     const deg = 180 / Math.PI;
 
-    const path = [];
-    for (let i = 0; i <= 360; i += 5) {
-        const bearing = i;
-        const dist = radiusDeg * rad;
+    // To prevent division by zero near equinoxes
+    let latRad = sunLat * rad;
+    if (Math.abs(latRad) < 1e-6) {
+        latRad = latRad >= 0 ? 1e-6 : -1e-6;
+    }
 
-        const lat1 = centerLat * rad;
-        const lon1 = centerLng * rad;
-        const brng = bearing * rad;
+    // Generate terminator points from West to East (-180 to 180)
+    for (let lng = -180; lng <= 180; lng += 2) {
+        const lngRad = lng * rad;
+        const sunLngRad = sunLng * rad;
+        
+        // Calculate the latitude of the terminator at this longitude
+        const termLatRad = Math.atan(-Math.cos(lngRad - sunLngRad) / Math.tan(latRad));
+        path.push({ lat: termLatRad * deg, lng: lng });
+    }
 
-        let arg = Math.sin(lat1) * Math.cos(dist) + Math.cos(lat1) * Math.sin(dist) * Math.cos(brng);
-        if (arg > 1) arg = 1;
-        if (arg < -1) arg = -1;
-        const lat2 = Math.asin(arg);
-        const lon2 = lon1 + Math.atan2(Math.sin(brng) * Math.sin(dist) * Math.cos(lat1), Math.cos(dist) - Math.sin(lat1) * Math.sin(lat2));
-
-        path.push({ lat: lat2 * deg, lng: lon2 * deg });
+    // Close the polygon based on the season (which pole is in darkness)
+    if (sunLat > 0) {
+        // Northern hemisphere summer -> sun in North -> night in South
+        // Close around the South Pole
+        path.push({ lat: -90, lng: 180 });
+        path.push({ lat: -90, lng: -180 });
+    } else {
+        // Northern hemisphere winter -> sun in South -> night in North
+        // Close around the North Pole
+        path.push({ lat: 90, lng: 180 });
+        path.push({ lat: 90, lng: -180 });
     }
 
     return path;
