@@ -9,7 +9,12 @@ SATELLITE_IDS = [
     "40115",           # WorldView-3
     "59625", "59626", "60452", "60453", "62900", "62901", # WorldView Legion 1-6
     "52320", "52322", "63125", "63126", # SuperView Neo-1 01-04
-    "66820"            # Kompsat-7
+    "66820",           # Kompsat-7
+    "63229",           # SpaceEye-T
+    "53587",           # Beijing-3N
+    "44804",           # CatroSat-3
+    "54880",           # EROS-C3
+    "63027", "64231", "66554", "68098" # Global 31-34
 ]
 BASE_URL = "https://celestrak.org/NORAD/elements/gp.php"
 OUTPUT_FILE = "satellites.json"

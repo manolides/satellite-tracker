@@ -317,32 +317,123 @@ function setupSatelliteOptionsUI() {
     listContainer.innerHTML = '';
 
     // Group satellites
-    const groups = {};
+    const initialGroups = {};
+    
     satellites.forEach(sat => {
         let groupName = "Other";
-        if (sat.name.includes("PLEIADES")) groupName = "Pleiades Neo";
-        else if (sat.name.includes("WORLDVIEW") || sat.name.includes("WV-")) groupName = "WorldView";
-        else if (sat.name.includes("LEGION")) groupName = "Legion";
-        else if (sat.name.includes("SUPERVIEW")) groupName = "SuperView";
-        else if (sat.name.includes("KOMPSAT")) groupName = "Kompsat";
+        const name = sat.name.toUpperCase();
+        if (name.includes("PLEIADES")) groupName = "Airbus";
+        else if (name.includes("WORLDVIEW") || name.includes("LEGION")) groupName = "Vantor";
+        else if (name.includes("GLOBAL")) groupName = "BlackSky";
+        else if (name.includes("KOMPSAT") || name.includes("SPACEEYE")) groupName = "SIIS";
+        else if (name.includes("SUPERVIEW")) groupName = "China Siwei";
+        else if (name.includes("CARTOSAT") || name.includes("CATROSAT")) groupName = "ISRO";
+        else if (name.includes("BEIJING")) groupName = "21AT";
 
-        if (!groups[groupName]) groups[groupName] = [];
-        groups[groupName].push(sat);
+        if (!initialGroups[groupName]) initialGroups[groupName] = [];
+        initialGroups[groupName].push(sat);
     });
 
+    const groups = { "Other": [] };
+    const dynamicOrder = [];
+    
+    for (const [gName, gSats] of Object.entries(initialGroups)) {
+        if (gName === "SIIS" || gSats.length === 1 || gName === "Other") {
+            groups["Other"].push(...gSats);
+        } else {
+            groups[gName] = gSats;
+            dynamicOrder.push(gName);
+        }
+    }
+    
+    const companyOrder = [...dynamicOrder, "Other"];
+
+    // Create a "Select All" checkbox at the top
+    const selectAllDiv = document.createElement('div');
+    selectAllDiv.className = 'sat-item select-all-item';
+    selectAllDiv.style.fontWeight = 'bold';
+    selectAllDiv.style.marginBottom = '10px';
+    selectAllDiv.style.borderBottom = '1px solid #ccc';
+    selectAllDiv.style.paddingBottom = '5px';
+
+    const selectAllCheckbox = document.createElement('input');
+    selectAllCheckbox.type = 'checkbox';
+    selectAllCheckbox.id = 'sat-select-all';
+    
+    // Check if all satellites are currently enabled
+    selectAllCheckbox.checked = satellites.length > 0 && satellites.every(sat => sat.enabled);
+
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        satellites.forEach(sat => {
+            if (sat.enabled !== isChecked) {
+                const cb = document.getElementById(`sat-${sat.catNr}`);
+                if (cb) cb.checked = isChecked;
+                toggleSatellite(sat.catNr, isChecked);
+            }
+        });
+        // Also update all group checkboxes
+        document.querySelectorAll('.group-checkbox').forEach(cb => {
+            cb.checked = isChecked;
+        });
+    });
+
+    const selectAllLabel = document.createElement('label');
+    selectAllLabel.htmlFor = 'sat-select-all';
+    selectAllLabel.textContent = 'Select All Satellites';
+
+    selectAllDiv.appendChild(selectAllCheckbox);
+    selectAllDiv.appendChild(selectAllLabel);
+    listContainer.appendChild(selectAllDiv);
+
     // Create UI elements
-    for (const [groupName, groupSats] of Object.entries(groups)) {
+    for (const groupName of companyOrder) {
+        const groupSats = groups[groupName];
+        if (!groupSats || groupSats.length === 0) continue;
+
         const groupDiv = document.createElement('div');
         groupDiv.className = 'sat-group';
 
         const titleDiv = document.createElement('div');
         titleDiv.className = 'sat-group-title';
-        titleDiv.textContent = groupName;
+        titleDiv.style.display = 'flex';
+        titleDiv.style.alignItems = 'center';
+        
+        const groupCheckbox = document.createElement('input');
+        groupCheckbox.type = 'checkbox';
+        groupCheckbox.className = 'group-checkbox';
+        groupCheckbox.id = `group-${groupName.replace(/\s+/g, '-')}`;
+        groupCheckbox.style.marginRight = '5px';
+        
+        // Group is checked if all its satellites are enabled
+        groupCheckbox.checked = groupSats.every(sat => sat.enabled);
+
+        groupCheckbox.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            groupSats.forEach(sat => {
+                if (sat.enabled !== isChecked) {
+                    const cb = document.getElementById(`sat-${sat.catNr}`);
+                    if (cb) cb.checked = isChecked;
+                    toggleSatellite(sat.catNr, isChecked);
+                }
+            });
+            // Update select all checkbox state
+            selectAllCheckbox.checked = satellites.every(sat => sat.enabled);
+        });
+
+        const groupLabel = document.createElement('label');
+        groupLabel.htmlFor = groupCheckbox.id;
+        groupLabel.textContent = groupName;
+        groupLabel.style.fontWeight = 'bold';
+
+        titleDiv.appendChild(groupCheckbox);
+        titleDiv.appendChild(groupLabel);
         groupDiv.appendChild(titleDiv);
 
         groupSats.forEach(sat => {
             const itemDiv = document.createElement('div');
             itemDiv.className = 'sat-item';
+            itemDiv.style.marginLeft = '20px';
 
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
@@ -352,6 +443,11 @@ function setupSatelliteOptionsUI() {
             checkbox.addEventListener('change', (e) => {
                 const isChecked = e.target.checked;
                 toggleSatellite(sat.catNr, isChecked);
+                
+                // Update group checkbox state
+                groupCheckbox.checked = groupSats.every(s => s.enabled);
+                // Update select all checkbox state
+                selectAllCheckbox.checked = satellites.every(s => s.enabled);
             });
 
             const label = document.createElement('label');
