@@ -4,11 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Real-time satellite tracker with orbit visualization, pass predictions, day/night terminator, and weather overlays powered by Google Maps.">
     <title>Satellite Tracker</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=2">
+    <link rel="stylesheet" href="style.css?v=3">
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-9XV6E9HN40"></script>
     <script>
@@ -41,31 +42,26 @@
     </div>
 
     <div id="map"></div>
-    <div id="branding">AIRBUS PLEIADES NEO</div>
+    <div id="branding">Satellite Tracker</div>
     <div id="controls">
         <div class="control-row">
             <label><input type="checkbox" id="toggleSolar"> Poor Sun Angle</label>
-            <div id="solar-date-controls" style="display: none; margin-left: 10px;">
-                <input type="date" id="solarDateInput" style="font-family: inherit; font-size: 12px;">
-                <button id="solarDateReset"
-                    style="font-family: inherit; font-size: 12px; cursor: pointer;">Live</button>
+            <div id="solar-date-controls" class="solar-date-controls">
+                <input type="date" id="solarDateInput" class="solar-date-input">
+                <button id="solarDateReset" class="solar-date-reset">Live</button>
             </div>
         </div>
         <div class="control-row">
-            <label style="margin-right: 10px;"><input type="checkbox" id="toggleSnow"> Snow Cover</label>
-            <label style="margin-right: 10px;"><input type="checkbox" id="toggleCloud"> Cloud Cover</label>
-            <button id="satOptionsBtn"
-                style="font-family: inherit; font-size: 14px; cursor: pointer; background: rgba(0,0,0,0.5); color: #0f0; border: 1px solid #0f0; padding: 2px 5px;">Satellite
-                Options</button>
+            <label class="control-label"><input type="checkbox" id="toggleSnow"> Snow Cover</label>
+            <label class="control-label"><input type="checkbox" id="toggleCloud"> Cloud Cover</label>
+            <button id="satOptionsBtn" class="sat-options-btn">Satellite Options</button>
         </div>
-        <div id="sat-options-panel"
-            style="display: none; position: absolute; bottom: 100%; right: 0; margin-bottom: 10px; background: rgba(0, 0, 0, 0.9); border: 1px solid #0f0; padding: 10px; z-index: 1000; max-height: 300px; overflow-y: auto; width: 200px;">
-            <h4 style="margin-top: 0; margin-bottom: 10px; border-bottom: 1px solid #0f0;">Visible Satellites</h4>
+        <div id="sat-options-panel" class="sat-options-panel">
+            <h4 class="sat-options-title">Visible Satellites</h4>
             <div id="sat-list">
                 <!-- Checkboxes will be generated here -->
             </div>
-            <button id="closeSatOptions"
-                style="margin-top: 10px; font-family: inherit; font-size: 12px; cursor: pointer; background: transparent; color: #0f0; border: 1px solid #0f0;">Close</button>
+            <button id="closeSatOptions" class="close-sat-options">Close</button>
         </div>
     </div>
 
@@ -77,9 +73,9 @@
         <div id="panel-body">
             <div class="input-group">
                 <input type="text" id="locationInput" placeholder="Enter City or Address">
-                <label for="maxOffNadir" style="color: #aaa; font-size: 12px; align-self: center;">Max
+                <label for="maxOffNadir" class="off-nadir-label">Max
                     Off-Nadir:</label>
-                <input type="number" id="maxOffNadir" value="30" min="1" max="50" style="width: 50px;"
+                <input type="number" id="maxOffNadir" value="30" min="1" max="50"
                     inputmode="numeric" pattern="[0-9]*">
                 <button id="predictBtn">Predict</button>
             </div>
@@ -99,14 +95,13 @@
                         <!-- Results will appear here -->
                     </tbody>
                 </table>
-                <div id="no-results" style="display:none; text-align: center; padding: 20px; color: #aaa;">
+                <div id="no-results" class="no-results">
                     No passes found in the next 365 days matching your criteria.
                 </div>
-                <div id="loading-spinner" style="display:none; text-align: center; padding: 20px;">
+                <div id="loading-spinner" class="loading-spinner">
                     <div class="spinner"></div>
                 </div>
-                <div id="reliability-warning"
-                    style="display:none; text-align: center; padding: 10px; color: #ff9800; font-size: 12px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <div id="reliability-warning" class="reliability-warning">
                     ⚠️ Predictions > 14 days out are rough estimates.
                 </div>
             </div>
@@ -120,7 +115,7 @@
             <div class="legend-item"><span class="circle-icon yellow"></span> Good (&le; 20&deg;)</div>
             <div class="legend-item"><span class="circle-icon red"></span> Fair (&le; 30&deg;)</div>
         </div>
-        <div id="sun-legend" style="display: none;">
+        <div id="sun-legend" class="sun-legend-hidden">
             <h4>Poor Sun Angle</h4>
             <div class="legend-item"><span class="square-icon red"></span> Always below 30&deg;</div>
             <div class="legend-item"><span class="square-icon yellow"></span> Sometimes above 30&deg;</div>
@@ -134,10 +129,18 @@
             target="_blank">NASA GIBS</a>
     </div>
 
-    <script src="script.js"></script>
-    <!-- Google Maps API - Replace YOUR_API_KEY with your actual key -->
+    <!-- Application Scripts (load order matters) -->
+    <script src="state.js"></script>
+    <script src="solar.js"></script>
+    <script src="tracking.js"></script>
+    <script src="satellites.js"></script>
+    <script src="prediction.js"></script>
+    <script src="wargames.js"></script>
+    <script src="main.js"></script>
+
+    <!-- Google Maps API -->
     <script
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWqXB0Cl1MRRKhfLY97xinkdvNlSjOim4&callback=initMap&loading=async"
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDWqXB0Cl1MRRKhfLY97xinkdvNlSjOim4&callback=initMap&loading=async&libraries=geometry"
         async defer></script>
 </body>
 

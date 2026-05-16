@@ -24,7 +24,6 @@ html {
     z-index: 1000;
     text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
     pointer-events: none;
-    /* Let clicks pass through to map */
     letter-spacing: 1px;
 }
 
@@ -46,6 +45,94 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     filter: grayscale(100%) brightness(400%);
 }
 
+/* Control Row Layout */
+.control-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.control-label {
+    margin-right: 10px;
+}
+
+/* Solar Date Controls */
+.solar-date-controls {
+    display: none;
+    margin-left: 10px;
+}
+
+.solar-date-input {
+    font-family: inherit;
+    font-size: 12px;
+}
+
+.solar-date-reset {
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* Satellite Options Button */
+.sat-options-btn {
+    font-family: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.5);
+    color: #0f0;
+    border: 1px solid #0f0;
+    padding: 2px 5px;
+}
+
+/* Satellite Options Panel */
+.sat-options-panel {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 10px;
+    background: rgba(0, 0, 0, 0.9);
+    border: 1px solid #0f0;
+    padding: 10px;
+    z-index: 1000;
+    max-height: 300px;
+    overflow-y: auto;
+    width: 200px;
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.sat-options-title {
+    margin-top: 0;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #0f0;
+}
+
+.close-sat-options {
+    margin-top: 10px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    background: transparent;
+    color: #0f0;
+    border: 1px solid #0f0;
+}
+
+/* Off-Nadir Label */
+.off-nadir-label {
+    color: #aaa;
+    font-size: 12px;
+    align-self: center;
+}
+
+/* NASA Attribution */
+.nasa-attribution {
+    background-color: rgba(255, 255, 255, 0.7);
+    padding: 2px 5px;
+    font-size: 10px;
+    margin: 5px;
+}
+
 /* Prediction Panel */
 #prediction-panel {
     position: absolute;
@@ -59,8 +146,6 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     z-index: 2000;
     font-size: 14px;
-    z-index: 2000;
-    font-size: 14px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
@@ -70,16 +155,13 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    /* Prevent body scroll */
     flex: 1;
 }
 
 #prediction-results {
     overflow-y: auto;
-    /* Scroll only results */
     flex: 1;
     min-height: 0;
-    /* Firefox flex fix */
 }
 
 #prediction-panel h3 {
@@ -132,9 +214,7 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     color: white;
     width: 60px;
     -moz-appearance: textfield;
-    /* Firefox */
     appearance: textfield;
-    /* Standard */
 }
 
 /* Hide spin buttons */
@@ -176,6 +256,35 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     font-weight: normal;
 }
 
+/* No Results / Loading / Warning */
+.no-results {
+    display: none;
+    text-align: center;
+    padding: 20px;
+    color: #aaa;
+}
+
+.loading-spinner {
+    display: none;
+    text-align: center;
+    padding: 20px;
+}
+
+.reliability-warning {
+    display: none;
+    text-align: center;
+    padding: 10px;
+    color: #ff9800;
+    font-size: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Timezone label in results */
+.tz-label {
+    font-size: 10px;
+    color: #aaa;
+}
+
 .quality-green {
     color: #4caf50;
     font-weight: bold;
@@ -201,11 +310,9 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
 #legends-container {
     position: absolute;
     bottom: 110px;
-    /* Above controls */
     left: 10px;
     display: flex;
     gap: 10px;
-    /* Space between legends */
     z-index: 1000;
 }
 
@@ -219,6 +326,10 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     font-size: 12px;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
     color: white;
+}
+
+.sun-legend-hidden {
+    display: none;
 }
 
 #map-legend h4,
@@ -244,7 +355,6 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     margin-right: 8px;
     display: inline-block;
     border: 1px solid;
-    /* Match stroke */
 }
 
 /* Relative sizes: Green < Yellow < Red */
@@ -311,6 +421,59 @@ img[src*="MODIS_Terra_NDSI_Snow_Cover"] {
     color: white;
 }
 
+/* Satellite Group Styling */
+.sat-group {
+    margin-bottom: 10px;
+}
+
+.sat-group-title {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: #aaa;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 5px;
+    padding-bottom: 2px;
+}
+
+.sat-group-title input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+.sat-group-title label {
+    font-weight: bold;
+}
+
+.sat-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: white;
+}
+
+.sat-item label {
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+.sat-item input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.sat-item-child {
+    margin-left: 20px;
+}
+
+.select-all-item {
+    font-weight: bold;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+
 /* --- WOPR / WarGames Mode --- */
 
 body.wopr-mode {
@@ -362,7 +525,6 @@ body.wopr-mode #branding {
 }
 
 body.wopr-simulation #branding {
-    /* Box style for WOPR simulation */
     background: rgba(0, 0, 0, 0.9);
     border: 2px solid #00ffff;
     padding: 5px 10px;
@@ -413,71 +575,32 @@ body.wopr-mode button:hover {
     box-shadow: 0 0 15px #00ffff;
 }
 
-/* Hide modern attributions or style them */
 body.wopr-mode #attributions {
     background: transparent;
     color: #00ffff;
     font-family: 'VT323', monospace;
 }
 
-body.wopr-mode
-
-/* De-modernize UI Elements */
-.wopr-mode button,
-.wopr-mode input,
-.wopr-mode .prediction-panel,
-.wopr-mode .controls {
-    border-radius: 0 !important;
-}
-
-.wopr-mode input {
-    background-color: transparent !important;
-    border: 1px solid #00ffff !important;
-    color: #00ffff !important;
-    font-family: 'VT323', monospace !important;
-    box-shadow: none !important;
-}
-
-.wopr-mode button {
-    background-color: #000000 !important;
-    border: 1px solid #00ffff !important;
-    color: #00ffff !important;
-    font-family: 'VT323', monospace !important;
-    text-transform: uppercase;
-    transition: all 0.1s ease;
-}
-
-.wopr-mode button:hover {
-    background-color: #00ffff !important;
-    color: #000000 !important;
-    box-shadow: 0 0 10px #00ffff;
-    cursor: pointer;
-}
-
-/* Adjust placeholder color */
-.wopr-mode input::placeholder {
-    color: rgba(0, 255, 255, 0.5) !important;
+/* De-modernize UI Elements in WOPR mode */
+body.wopr-mode input::placeholder {
+    color: rgba(0, 255, 255, 0.5);
 }
 
 body.wopr-mode .gm-style-cc {
     display: none;
-    /* Hide Google copyright if possible/allowed, or style it */
     opacity: 0.5;
 }
 
 /* WOPR Status Display */
 #wopr-status {
     display: none;
-    /* Hidden by default */
 }
 
 .wopr-mode #wopr-status {
     display: block;
     position: fixed;
     bottom: 25px;
-    /* Aligned with typical Google Maps controls */
     right: 70px;
-    /* To the left of the zoom controls (approx 40-50px wide) */
     text-align: right;
     z-index: 1000;
     pointer-events: none;
@@ -486,7 +609,6 @@ body.wopr-mode .gm-style-cc {
 #zulu-clock {
     font-family: 'VT323', monospace;
     font-size: 24px;
-    /* Slightly smaller for bottom bar */
     color: #00ffff;
     text-shadow: 0 0 5px #00ffff;
     background-color: rgba(0, 0, 0, 0.8);
@@ -550,11 +672,12 @@ body.wopr-simulation #nasa-attribution {
     height: 100%;
     background: #000;
     z-index: 99999;
-    /* Top of everything */
     display: none;
     align-items: center;
     justify-content: center;
     flex-direction: column;
+    opacity: 0;
+    animation: fadeIn 3s ease-in forwards;
 }
 
 #game-over-text {
@@ -623,25 +746,6 @@ body.wopr-simulation #nasa-attribution {
     }
 }
 
-#game-over-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: #000;
-    z-index: 99999;
-    /* Top of everything */
-    display: none;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    opacity: 0;
-    /* Start hidden */
-    animation: fadeIn 3s ease-in forwards;
-    /* Slow fade in, persist state */
-}
-
 .shutter-effect {
     animation: shutter 0.5s ease-out forwards;
 }
@@ -670,50 +774,6 @@ body.wopr-simulation #nasa-attribution {
 
 .screen-flutter {
     animation: flutter 0.2s ease-in-out 2;
-}
-
-.control-row {
-    display: flex;
-    align-items: center;
-    margin-bottom: 5px;
-}
-
-
-/* Satellite Options Panel */
-#sat-options-panel {
-    border-radius: 5px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-}
-
-.sat-group {
-    margin-bottom: 10px;
-}
-
-.sat-group-title {
-    font-size: 11px;
-    color: #aaa;
-    text-transform: uppercase;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    margin-bottom: 5px;
-    padding-bottom: 2px;
-}
-
-.sat-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 4px;
-    font-size: 12px;
-    color: white;
-}
-
-.sat-item label {
-    margin-left: 5px;
-    cursor: pointer;
-}
-
-.sat-item input[type="checkbox"] {
-    margin: 0;
-    cursor: pointer;
 }
 
 /* WOPR Mode for Satellite Panel */
