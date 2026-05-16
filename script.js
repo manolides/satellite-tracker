@@ -281,6 +281,8 @@ async function fetchTLEs() {
             return {
                 name: item.name,
                 catNr: item.catNr,
+                line1: item.line1,
+                line2: item.line2,
                 enabled: isDefault,
                 satrec: satellite.twoline2satrec(item.line1, item.line2),
                 marker: null,
@@ -1075,31 +1077,13 @@ async function handlePrediction() {
         });
         map.panTo(coords);
 
-        const passes = [];
-        // We want a total of 5 passes combined across all satellites.
-        // Since we have 2 satellites, we can't just ask for 5 from each.
-        // We should search day by day until we have 5 total.
+        // Run prediction in a Web Worker to avoid blocking the UI.
+        // Only enabled satellites are sent to the worker.
+        const enabledSats = satellites
+            .filter(sat => sat.satrec && sat.enabled)
+            .map(sat => ({ name: sat.name, catNr: sat.catNr, line1: sat.line1, line2: sat.line2 }));
 
-        // Actually, simpler approach:
-        // Ask for 5 passes from EACH satellite over a long period (e.g. 14 days),
-        // then combine and take the top 5 soonest.
-
-        const promises = satellites.map(async sat => {
-            if (sat.satrec && sat.enabled) {
-                return predictPasses(sat, coords, maxOffNadir, 5, 365); // Limit 5, Max 365 days
-            }
-            return [];
-        });
-
-        const results = await Promise.all(promises);
-        results.forEach(p => passes.push(...p));
-
-        // Sort by time
-        passes.sort((a, b) => a.startTime - b.startTime);
-
-        // Take top 5
-        const topPasses = passes.slice(0, 5);
-
+        const topPasses = await runPredictionWorker(enabledSats, coords.lat(), coords.lng(), maxOffNadir);
         displayResults(topPasses);
 
     } catch (error) {
@@ -1127,6 +1111,58 @@ function geocodeAddress(address) {
                 }
                 resolve(null);
             }
+        });
+    });
+}
+// --- Pass Prediction Worker ---
+
+let predictionWorker = null;
+let predictionRequestId = 0;
+
+/**
+ * Runs satellite pass prediction in a background Web Worker.
+ * Cancels any in-progress prediction when called again.
+ *
+ * @param {Array} enabledSats - Array of { name, catNr, line1, line2 }
+ * @param {number} observerLat - Observer latitude in degrees
+ * @param {number} observerLng - Observer longitude in degrees
+ * @param {number} maxOffNadir - Maximum allowed off-nadir angle
+ * @returns {Promise<Array>} Resolved with sorted top-5 passes
+ */
+function runPredictionWorker(enabledSats, observerLat, observerLng, maxOffNadir) {
+    return new Promise((resolve, reject) => {
+        // Terminate any existing worker to cancel stale predictions
+        if (predictionWorker) {
+            predictionWorker.terminate();
+            predictionWorker = null;
+        }
+
+        predictionWorker = new Worker('prediction-worker.js');
+        const requestId = ++predictionRequestId;
+
+        predictionWorker.onmessage = (e) => {
+            if (e.data.requestId !== requestId) return; // Stale result
+
+            // Convert timestamps back to Date objects for displayResults
+            const passes = e.data.passes.map(p => ({
+                ...p,
+                startTime: new Date(p.startTime)
+            }));
+
+            resolve(passes);
+        };
+
+        predictionWorker.onerror = (err) => {
+            console.error('Prediction worker error:', err);
+            reject(new Error('Pass prediction failed. Please try again.'));
+        };
+
+        predictionWorker.postMessage({
+            requestId,
+            satellites: enabledSats,
+            observerLat,
+            observerLng,
+            maxOffNadir
         });
     });
 }
