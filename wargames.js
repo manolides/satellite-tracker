@@ -815,6 +815,11 @@ class ScenarioManager {
                 fireFailedGBI(triggerTime);
                 fireFailedGBI(triggerTime + (500 * timeScale)); // 2nd one shortly after
 
+                // Change DEFCON to 2 a few seconds after interceptors fail
+                setTimeout(() => {
+                    this.updateDefcon(2);
+                }, triggerTime + gbiDur + (2000 * timeScale));
+
             } catch (e) { console.error("Phase 1 Crash:", e); }
         });
 
