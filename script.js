@@ -24,6 +24,10 @@ let satellites = []; // Will be populated from JSON
 let isSolarDateCustom = false;
 let customSolarDate = null;
 
+// Update throttle state
+let _trackUpdateCounter = 0;
+let _lastSolarUpdate = 0;
+
 const SATELLITE_ICON_PATH = "M2 9l-2-2 4-4 2 2-4 4zm2-2l6-6 2 2-6 6-2-2zm-2 2l-2 2 4 4 2-2-4-4zm11-11l2-2 4 4-2 2-4-4zm-2 2l6 6-2 2-6-6 2-2z";
 // A simple satellite shape: body and solar panels
 const SATELLITE_SVG = {
@@ -371,13 +375,15 @@ function setupSatelliteOptionsUI() {
             if (sat.enabled !== isChecked) {
                 const cb = document.getElementById(`sat-${sat.catNr}`);
                 if (cb) cb.checked = isChecked;
-                toggleSatellite(sat.catNr, isChecked);
+                toggleSatellite(sat.catNr, isChecked, true); // skip individual updates
             }
         });
         // Also update all group checkboxes
         document.querySelectorAll('.group-checkbox').forEach(cb => {
             cb.checked = isChecked;
         });
+        // Single batched update
+        updatePositions();
     });
 
     const selectAllLabel = document.createElement('label');
@@ -416,11 +422,13 @@ function setupSatelliteOptionsUI() {
                 if (sat.enabled !== isChecked) {
                     const cb = document.getElementById(`sat-${sat.catNr}`);
                     if (cb) cb.checked = isChecked;
-                    toggleSatellite(sat.catNr, isChecked);
+                    toggleSatellite(sat.catNr, isChecked, true); // skip individual updates
                 }
             });
             // Update select all checkbox state
             selectAllCheckbox.checked = satellites.every(sat => sat.enabled);
+            // Single batched update
+            updatePositions();
         });
 
         const groupLabel = document.createElement('label');
@@ -465,7 +473,7 @@ function setupSatelliteOptionsUI() {
     }
 }
 
-function toggleSatellite(catNr, enabled) {
+function toggleSatellite(catNr, enabled, skipUpdate = false) {
     const sat = satellites.find(s => s.catNr === catNr);
     if (!sat) return;
 
@@ -481,8 +489,8 @@ function toggleSatellite(catNr, enabled) {
         if (sat.futurePath) sat.futurePath.setMap(map);
         sat.cones.forEach(cone => cone.setMap(map));
 
-        // Force an update immediately
-        updatePositions();
+        // Force an update immediately (unless batching)
+        if (!skipUpdate) updatePositions();
     } else {
         // Hide existing visuals
         if (sat.marker) sat.marker.setMap(null);
@@ -581,6 +589,30 @@ function getLatLngAtTime(satrec, date) {
 }
 
 /**
+ * Combined position + altitude in a single propagation call.
+ * Used by the main update loop to avoid redundant satellite.propagate() calls.
+ *
+ * @param {Object} satrec - The satellite record object from satellite.js
+ * @param {Date} date - The time to calculate position for
+ * @returns {Object|null} {lat, lng, altitudeKm} or null if calculation fails
+ */
+function getPositionAtTime(satrec, date) {
+    const positionAndVelocity = satellite.propagate(satrec, date);
+    const positionEci = positionAndVelocity.position;
+
+    if (!positionEci) return null;
+
+    const gmst = satellite.gstime(date);
+    const positionGd = satellite.eciToGeodetic(positionEci, gmst);
+
+    return {
+        lat: satellite.degreesLat(positionGd.latitude),
+        lng: satellite.degreesLong(positionGd.longitude),
+        altitudeKm: positionGd.height
+    };
+}
+
+/**
  * Calculates the radius of the satellite's footprint on the ground based on the
  * maximum off-nadir angle.
  * 
@@ -629,64 +661,73 @@ function calculateFootprintRadius(altitudeKm, offNadirDeg) {
  * Main animation loop. Updates the position of all satellites, markers, cones,
  * and the day/night terminator.
  * Called every second.
+ *
+ * Performance notes:
+ * - Marker + cones update every tick (1s) for real-time feel
+ * - Tracks (past/future paths) update every 10s (62 propagations/sat saved per skip)
+ * - Solar angle layer updates every 60s (declination barely changes)
  */
 function updatePositions() {
     const now = new Date();
+    const nowMs = now.getTime();
 
+    // Night terminator: update every tick (visible movement)
     updateNightLayer(now);
 
-    if (isSolarDateCustom && customSolarDate) {
-        updateSolarAngleLayer(customSolarDate);
-    } else {
-        updateSolarAngleLayer(now);
+    // Solar angle: update every 60 seconds (declination changes ~0.004°/min)
+    if (nowMs - _lastSolarUpdate >= 60000) {
+        if (isSolarDateCustom && customSolarDate) {
+            updateSolarAngleLayer(customSolarDate);
+        } else {
+            updateSolarAngleLayer(now);
+        }
+        _lastSolarUpdate = nowMs;
     }
+
+    // Track update counter: recalculate paths every 10 ticks (10s)
+    _trackUpdateCounter++;
+    const shouldUpdateTracks = (_trackUpdateCounter % 10 === 0);
 
     satellites.forEach(sat => {
         if (!sat.satrec || !sat.enabled) return;
 
+        // Single propagation for position + altitude
+        const pos = getPositionAtTime(sat.satrec, now);
+        if (!pos) return;
+
         // Update Marker
-        const currentPos = getLatLngAtTime(sat.satrec, now);
-        if (currentPos && sat.marker) {
-            if (isNaN(currentPos.lat) || isNaN(currentPos.lng)) {
-                console.error(`Invalid position for ${sat.name}:`, currentPos);
+        if (sat.marker) {
+            sat.marker.setPosition({ lat: pos.lat, lng: pos.lng });
+        }
+
+        // Update Cones (uses altitude from same propagation)
+        const offNadirAngles = [10, 20, 30];
+        sat.cones.forEach((cone, index) => {
+            const radius = calculateFootprintRadius(pos.altitudeKm, offNadirAngles[index]);
+            cone.setCenter({ lat: pos.lat, lng: pos.lng });
+            cone.setRadius(radius);
+        });
+
+        // Update Tracks (throttled to every 10 seconds)
+        if (shouldUpdateTracks) {
+            // Past track (last 30 mins)
+            const pastPathCoords = [];
+            for (let i = -30; i <= 0; i += 2) {
+                const t = new Date(nowMs + i * 60000);
+                const p = getLatLngAtTime(sat.satrec, t);
+                if (p) pastPathCoords.push(p);
             }
-            sat.marker.setPosition(currentPos);
+            if (sat.pastPath) sat.pastPath.setPath(pastPathCoords);
 
-            // Update Cones
-            // We need altitude. satellite.js gives position in km.
-            const positionAndVelocity = satellite.propagate(sat.satrec, now);
-            const positionEci = positionAndVelocity.position;
-            const gmst = satellite.gstime(now);
-            const positionGd = satellite.eciToGeodetic(positionEci, gmst);
-            const altitudeKm = positionGd.height; // Height in km
-
-            const offNadirAngles = [10, 20, 30];
-
-            sat.cones.forEach((cone, index) => {
-                const radius = calculateFootprintRadius(altitudeKm, offNadirAngles[index]);
-                cone.setCenter(currentPos);
-                cone.setRadius(radius);
-            });
+            // Future track (next 90 mins)
+            const futurePathCoords = [];
+            for (let i = 0; i <= 90; i += 2) {
+                const t = new Date(nowMs + i * 60000);
+                const p = getLatLngAtTime(sat.satrec, t);
+                if (p) futurePathCoords.push(p);
+            }
+            if (sat.futurePath) sat.futurePath.setPath(futurePathCoords);
         }
-
-        // Update Tracks
-        // Calculate past track (last 90 mins)
-        const pastPathCoords = [];
-        for (let i = -30; i <= 0; i += 2) { // Every 2 minutes
-            const t = new Date(now.getTime() + i * 60000);
-            const pos = getLatLngAtTime(sat.satrec, t);
-            if (pos) pastPathCoords.push(pos);
-        }
-        if (sat.pastPath) sat.pastPath.setPath(pastPathCoords);
-
-        // Calculate future track (next 90 mins)
-        const futurePathCoords = [];
-        for (let i = 0; i <= 90; i += 2) { // Every 2 minutes
-            const t = new Date(now.getTime() + i * 60000);
-            const pos = getLatLngAtTime(sat.satrec, t);
-            if (pos) futurePathCoords.push(pos);
-        }
-        if (sat.futurePath) sat.futurePath.setPath(futurePathCoords);
     });
 }
 
