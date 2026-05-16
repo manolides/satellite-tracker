@@ -25,7 +25,7 @@ let isSolarDateCustom = false;
 let customSolarDate = null;
 
 // Update throttle state
-let _trackUpdateCounter = 0;
+let _trackUpdateCounter = -1;
 let _lastSolarUpdate = 0;
 
 const SATELLITE_ICON_PATH = "M2 9l-2-2 4-4 2 2-4 4zm2-2l6-6 2 2-6 6-2-2zm-2 2l-2 2 4 4 2-2-4-4zm11-11l2-2 4 4-2 2-4-4zm-2 2l6 6-2 2-6-6 2-2z";
