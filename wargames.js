@@ -857,8 +857,10 @@ class ScenarioManager {
                 // Helper to launch list
                 const fire = (tgts, origins) => {
                     tgts.forEach((t, i) => {
-                        const m = launch(origins[i % origins.length], t, '#FF0000', 15000, true);
-                        this.attemptIntercept(m, 'US', GBI_SPEED, ru_lead);
+                        setTimeout(() => {
+                            const m = launch(origins[i % origins.length], t, '#FF0000', 15000, true);
+                            this.attemptIntercept(m, 'US', GBI_SPEED, ru_lead);
+                        }, Math.random() * 8000);
                     });
                 };
 
@@ -892,28 +894,34 @@ class ScenarioManager {
         this.schedule(t6_cn, () => {
             const targets = CN_PACIFIC_TARGETS;
             targets.forEach((t, i) => {
-                const m = launch(CN_LAUNCH[i % 2], t, '#FF9900', 12000, true);
-                let def = 'US';
-                let lead = ru_lead;
-                if (t.lat > 30 && t.lng > 120 && t.lng < 150) { def = 'JP'; lead = 2000; }
-                this.attemptIntercept(m, def, GBI_SPEED, lead);
+                setTimeout(() => {
+                    const m = launch(CN_LAUNCH[i % 2], t, '#FF9900', 12000, true);
+                    let def = 'US';
+                    let lead = ru_lead;
+                    if (t.lat > 30 && t.lng > 120 && t.lng < 150) { def = 'JP'; lead = 2000; }
+                    this.attemptIntercept(m, def, GBI_SPEED, lead);
+                }, Math.random() * 8000);
             });
         });
 
         // Phase 8: Regional Conflicts
         const t8_pk = 40000;
         this.schedule(t8_pk, () => {
-            REGIONAL_TARGETS.INDIA.forEach((t) => launch(PAKISTAN_LAUNCH[0], t, '#00FF00', 5000, true));
+            REGIONAL_TARGETS.INDIA.forEach((t) => {
+                setTimeout(() => launch(PAKISTAN_LAUNCH[0], t, '#00FF00', 5000, true), Math.random() * 5000);
+            });
 
             // Israel/Iran
             REGIONAL_TARGETS.IRAN.forEach((t) => {
-                launch(ISRAEL_LAUNCH[0], t, '#0088FF', 5000, true);
+                setTimeout(() => launch(ISRAEL_LAUNCH[0], t, '#0088FF', 5000, true), Math.random() * 5000);
             });
             REGIONAL_TARGETS.ISRAEL.forEach((t) => {
                 for (let i = 0; i < 3; i++) { // Reduce spam
-                    const origin = IRAN_LAUNCH[0];
-                    const target = t; // Targeting Israel!
-                    launch(origin, target, '#CC00FF', 5000, true);
+                    setTimeout(() => {
+                        const origin = IRAN_LAUNCH[0];
+                        const target = t; // Targeting Israel!
+                        launch(origin, target, '#CC00FF', 5000, true);
+                    }, Math.random() * 5000);
                 }
             });
         });
