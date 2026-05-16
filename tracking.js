@@ -177,8 +177,8 @@ function updatePositions() {
             cone.setRadius(radius);
         });
 
-        // Update Tracks (throttled to every 10 seconds)
-        if (shouldUpdateTracks) {
+        // Update Tracks (throttled to every 10 seconds or when forced)
+        if (shouldUpdateTracks || sat.needsTrackUpdate) {
             // Past track (last 30 mins)
             const pastPathCoords = [];
             for (let i = -30; i <= 0; i += 2) {
@@ -196,6 +196,8 @@ function updatePositions() {
                 if (p) futurePathCoords.push(p);
             }
             if (sat.futurePath) sat.futurePath.setPath(futurePathCoords);
+            
+            sat.needsTrackUpdate = false;
         }
     });
 }

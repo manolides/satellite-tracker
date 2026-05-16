@@ -193,6 +193,7 @@ function toggleSatellite(catNr, enabled, skipUpdate = false) {
     sat.enabled = enabled;
 
     if (enabled) {
+        sat.needsTrackUpdate = true;
         createVisuals(sat);
 
         if (sat.marker) sat.marker.setMap(map);
