@@ -784,11 +784,18 @@ class ScenarioManager {
                 // FIX: Calculate generic fast duration
                 let gbiDur = getDuration(FT_GREELY, targetPos, 4000);
 
-                const launchDelay = (p1_flightDur * 0.5);
-                // We fire exactly when missile is at 50% (7.5s in Fast Mode).
-                // GBI takes 4s.
-                // It arrives at T+11.5s. Missile impact at T+15s.
-                // It will chase and "miss" (fail script).
+                // We want the GBI to arrive at targetPos (80% of path) slightly before the ICBM gets there.
+                // ICBM reaches targetPos at:
+                const t_intercept = p1_flightDur * 0.8;
+
+                // GBI needs to launch at this time to arrive exactly at t_intercept
+                let triggerTime = t_intercept - gbiDur;
+
+                // Introduce a whiff (miss early by a tiny fraction of flight duration)
+                triggerTime -= (p1_flightDur * 0.02);
+
+                // Safe fallback in case GBI is somehow slower than ICBM
+                if (triggerTime < 500) triggerTime = p1_flightDur * 0.5;
 
                 const fireFailedGBI = (delayMs) => {
                     setTimeout(() => {
@@ -804,11 +811,9 @@ class ScenarioManager {
                     }, delayMs);
                 };
 
-                // Fire 2 GBIs
-                // Timing: When nuke is 50% there.
-                const triggerTime = p1_flightDur * 0.5;
+                // Fire 2 GBIs with visually distinct staggering
                 fireFailedGBI(triggerTime);
-                fireFailedGBI(triggerTime + 500); // 2nd one shortly after
+                fireFailedGBI(triggerTime + (500 * timeScale)); // 2nd one shortly after
 
             } catch (e) { console.error("Phase 1 Crash:", e); }
         });
