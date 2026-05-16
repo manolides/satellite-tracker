@@ -753,7 +753,7 @@ class ScenarioManager {
         this.updateDefcon(5);
 
         // --- PHASE 1: THE TRIGGER (Arctic -> Chicago) ---
-        const t1_delay = 5000 * timeScale; // T+5s
+        const t1_delay = 5000; // T+5s (Don't scale this, we want it to start quickly)
         let p1_flightDur = 0;
 
         // Define Lead Times
