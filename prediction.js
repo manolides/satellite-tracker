@@ -80,7 +80,7 @@ async function handlePrediction() {
 
     // Secret Code Triggers
     const inputUpper = locationValue.trim().toUpperCase();
-    if (inputUpper === "JOSHUA" || inputUpper === "WOPR" || inputUpper === "WOPR1") {
+    if (inputUpper === "JOSHUA" || inputUpper === "WOPR" || inputUpper === "WOPR1" || inputUpper === "WOPR_REALTIME") {
         if (inputUpper === "JOSHUA" && isWarGamesMode) {
             exitWarGamesMode();
             locationInputEl.value = "";
@@ -89,6 +89,7 @@ async function handlePrediction() {
 
         let scenario = 0;
         if (inputUpper === "WOPR" || inputUpper === "WOPR1") scenario = 1;
+        if (inputUpper === "WOPR_REALTIME") scenario = 4;
 
         toggleWarGamesMode(scenario);
         locationInputEl.value = "";

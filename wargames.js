@@ -354,8 +354,8 @@ class ScenarioManager {
             this.userLocation = await this.fetchUserLocation();
         }
 
-        if (id === 1) this.runScenario1();
-        else if (id === 4) this.runScenario1(); // Realistic
+        if (id === 1) this.runScenario1(false);
+        else if (id === 4) this.runScenario1(true); // Realistic
         // Scenarios 2 and 3 not yet implemented
     }
 
@@ -569,13 +569,16 @@ class ScenarioManager {
     }
 
     // --- SCENARIO 1: HOUSE OF DYNAMITE (GLOBAL WAR) ---
-    runScenario1() {
+    runScenario1(isRealtime = false) {
         // Configuration
         const ICBM_SPEED = 15000; // mph
         const GBI_SPEED = ICBM_SPEED * 1.2; // 120% of ICBM Speed
 
+        const timeScale = isRealtime ? 60 : 1; // 1 second fast = 1 minute real
+
         // Helper to get consistent physics duration or fallback
         const getDuration = (origin, target, defaultDur) => {
+            if (isRealtime) return this.calculateFlightDuration(origin, target, ICBM_SPEED);
             return defaultDur;
         };
 
@@ -750,7 +753,7 @@ class ScenarioManager {
         this.updateDefcon(5);
 
         // --- PHASE 1: THE TRIGGER (Arctic -> Chicago) ---
-        const t1_delay = 5000; // T+5s
+        const t1_delay = 5000 * timeScale; // T+5s
         let p1_flightDur = 0;
 
         // Define Lead Times
@@ -772,8 +775,14 @@ class ScenarioManager {
                     0.5 // Mid-course intercept
                 );
 
+                const targetPos = google.maps.geometry.spherical.interpolate(
+                    new google.maps.LatLng(PACIFIC_UNKNOWN),
+                    new google.maps.LatLng(CHICAGO),
+                    0.8 // Intercept late
+                );
+
                 // FIX: Calculate generic fast duration
-                let gbiDur = 4000;
+                let gbiDur = getDuration(FT_GREELY, targetPos, 4000);
 
                 const launchDelay = (p1_flightDur * 0.5);
                 // We fire exactly when missile is at 50% (7.5s in Fast Mode).
@@ -783,13 +792,6 @@ class ScenarioManager {
 
                 const fireFailedGBI = (delayMs) => {
                     setTimeout(() => {
-                        // Aim for where missile WILL be
-                        const targetPos = google.maps.geometry.spherical.interpolate(
-                            new google.maps.LatLng(PACIFIC_UNKNOWN),
-                            new google.maps.LatLng(CHICAGO),
-                            0.8 // Intercept late
-                        );
-
                         // Fire GBI
                         const gbi = this.launchMissile(FT_GREELY, targetPos, '#FFFFFF', gbiDur, false);
 
@@ -817,7 +819,7 @@ class ScenarioManager {
 
         // --- PHASE 3: US RETALIATION ---
         // "US launches 1 minute before impact" (of Phase 1)
-        const t3_launch = 18000;
+        const t3_launch = 18000 * timeScale;
 
         this.schedule(t3_launch, () => {
             try {
@@ -830,7 +832,7 @@ class ScenarioManager {
                     setTimeout(() => {
                         const m = launch(origin, target, '#0088FF', 10000 + Math.random() * 2000, true);
                         this.attemptIntercept(m, 'RU', GBI_SPEED, lead);
-                    }, Math.random() * 5000);
+                    }, Math.random() * 5000 * timeScale);
                 });
             } catch (e) { console.error("Phase 3 Crash:", e); }
         });
@@ -838,8 +840,8 @@ class ScenarioManager {
         // --- PHASE 4: RUSSIA LAUNCH ---
         // Mainland: 10 mins later (than US Launch)
         // Subs: 5 mins later (than US Launch)
-        const t4a_subs = 25000;
-        const t4b_main = 30000; // Staggered in fast mode
+        const t4a_subs = 25000 * timeScale;
+        const t4b_main = 30000 * timeScale; // Staggered in fast mode
 
         const ru_lead = 2000;
         const eu_lead = 2000;
@@ -860,7 +862,7 @@ class ScenarioManager {
                         setTimeout(() => {
                             const m = launch(origins[i % origins.length], t, '#FF0000', 15000, true);
                             this.attemptIntercept(m, 'US', GBI_SPEED, ru_lead);
-                        }, Math.random() * 8000);
+                        }, Math.random() * 8000 * timeScale);
                     });
                 };
 
@@ -882,14 +884,14 @@ class ScenarioManager {
                         if (t.lng > -30 && t.lng < 40) { def = 'EU'; lead = eu_lead; }
 
                         this.attemptIntercept(m, def, GBI_SPEED, lead);
-                    }, Math.random() * 10000);
+                    }, Math.random() * 10000 * timeScale);
                 });
             } catch (e) { console.error("Phase 4b Crash:", e); }
         });
 
         // --- PHASE 6: CHINA ---
         // "China launches 10 minutes later" (Assuming after RU Mainland)
-        const t6_cn = 32000;
+        const t6_cn = 32000 * timeScale;
 
         this.schedule(t6_cn, () => {
             const targets = CN_PACIFIC_TARGETS;
@@ -900,20 +902,20 @@ class ScenarioManager {
                     let lead = ru_lead;
                     if (t.lat > 30 && t.lng > 120 && t.lng < 150) { def = 'JP'; lead = 2000; }
                     this.attemptIntercept(m, def, GBI_SPEED, lead);
-                }, Math.random() * 8000);
+                }, Math.random() * 8000 * timeScale);
             });
         });
 
         // Phase 8: Regional Conflicts
-        const t8_pk = 40000;
+        const t8_pk = 40000 * timeScale;
         this.schedule(t8_pk, () => {
             REGIONAL_TARGETS.INDIA.forEach((t) => {
-                setTimeout(() => launch(PAKISTAN_LAUNCH[0], t, '#00FF00', 5000, true), Math.random() * 5000);
+                setTimeout(() => launch(PAKISTAN_LAUNCH[0], t, '#00FF00', 5000, true), Math.random() * 5000 * timeScale);
             });
 
             // Israel/Iran
             REGIONAL_TARGETS.IRAN.forEach((t) => {
-                setTimeout(() => launch(ISRAEL_LAUNCH[0], t, '#0088FF', 5000, true), Math.random() * 5000);
+                setTimeout(() => launch(ISRAEL_LAUNCH[0], t, '#0088FF', 5000, true), Math.random() * 5000 * timeScale);
             });
             REGIONAL_TARGETS.ISRAEL.forEach((t) => {
                 for (let i = 0; i < 3; i++) { // Reduce spam
@@ -921,18 +923,18 @@ class ScenarioManager {
                         const origin = IRAN_LAUNCH[0];
                         const target = t; // Targeting Israel!
                         launch(origin, target, '#CC00FF', 5000, true);
-                    }, Math.random() * 5000);
+                    }, Math.random() * 5000 * timeScale);
                 }
             });
         });
 
         // Finale: Last Shot (T+48s)
-        this.schedule(48000, () => { // +5 mins after China's launch
+        this.schedule(48000 * timeScale, () => { // +5 mins after China's launch
             // this.activeMissiles.forEach(m => m.remove()); // Don't clear missiles, keep chaos visible
             // Keep detonations (scars) on screen
 
             const origin = { lat: 88, lng: 0 };
-            const dur = 6000;
+            const dur = getDuration(origin, this.userLocation, 6000);
             const ms = this.launchMissile(origin, this.userLocation, '#FFFFFF', dur, false);
             // BOOST VISIBILITY
             ms.dashedLine.setOptions({
@@ -948,7 +950,7 @@ class ScenarioManager {
 
             // NO PROTECTION FOR THIS ONE - User dies here.
 
-            const delay = 6000;
+            const delay = dur;
 
             setTimeout(() => {
                 this.detonate(this.userLocation, 2000000, '#FFFFFF');
