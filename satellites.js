@@ -85,7 +85,28 @@ function setupSatelliteOptionsUI() {
         }
     }
 
-    const companyOrder = [...dynamicOrder, "Other"];
+    const companyOrder = [...dynamicOrder.filter(g => g !== "Classified"), "Other"];
+    if (dynamicOrder.includes("Classified")) {
+        companyOrder.push("Classified");
+    }
+
+    if (groups["Classified"]) {
+        const getNationality = (name) => {
+            if (name.includes("USA-")) return "US";
+            if (name.includes("PERSONA") || name.includes("RESURS")) return "Russia";
+            if (name.includes("OFEQ")) return "Israel";
+            if (name.includes("YAOGAN") || name.includes("GAOFEN")) return "China";
+            return "Unknown";
+        };
+        groups["Classified"].sort((a, b) => {
+            const natA = getNationality(a.name);
+            const natB = getNationality(b.name);
+            if (natA !== natB) {
+                return natA.localeCompare(natB);
+            }
+            return a.name.localeCompare(b.name);
+        });
+    }
 
     // Create "Select All" checkbox
     const selectAllDiv = document.createElement('div');
