@@ -14,7 +14,7 @@ SATELLITE_IDS = [
     "53587",           # Beijing-3N
     "44804",           # CatroSat-3
     "54880",           # EROS-C3
-    "63027", "64231", "66554", "68098" # Global 31-34
+    "63027", "64231", "66554", "68098"  # Global 31-34
 ]
 BASE_URL = "https://celestrak.org/NORAD/elements/gp.php"
 OUTPUT_FILE = "satellites.json"
@@ -73,6 +73,16 @@ def fetch_tles():
                 
         except Exception as e:
             print(f"Error fetching {sat_id}: {e}")
+
+    # Load classified satellites
+    try:
+        if os.path.exists('classified_tles.json'):
+            with open('classified_tles.json', 'r') as f:
+                classified = json.load(f)
+                all_satellites.extend(classified)
+                print(f"Added {len(classified)} classified satellites from local file.")
+    except Exception as e:
+        print(f"Error loading classified TLEs: {e}")
 
     # Save to file
     try:

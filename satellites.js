@@ -9,7 +9,7 @@
  */
 async function fetchTLEs() {
     try {
-        const response = await fetch('./satellites.json');
+        const response = await fetch('./satellites.json?v=' + new Date().getTime());
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
@@ -66,6 +66,7 @@ function setupSatelliteOptionsUI() {
         else if (name.includes("SUPERVIEW")) groupName = "China Siwei";
         else if (name.includes("CARTOSAT") || name.includes("CATROSAT")) groupName = "ISRO";
         else if (name.includes("BEIJING")) groupName = "21AT";
+        else if (name.includes("USA-") || name.includes("PERSONA") || name.includes("RESURS") || name.includes("OFEQ") || name.includes("YAOGAN") || name.includes("GAOFEN")) groupName = "Classified";
 
         if (!initialGroups[groupName]) initialGroups[groupName] = [];
         initialGroups[groupName].push(sat);
