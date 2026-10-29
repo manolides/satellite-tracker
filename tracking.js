@@ -61,6 +61,17 @@ function calculateFootprintRadius(altitudeKm, offNadirDeg) {
     return distanceKm * 1000;
 }
 
+/**
+ * Calculates the radius of the ground visibility footprint (horizon line-of-sight)
+ * — the region on Earth where the satellite is above the local horizon.
+ */
+function calculateVisibilityRadius(altitudeKm) {
+    if (altitudeKm <= 0) return 0;
+    const R_EARTH = 6371;
+    const beta = Math.acos(R_EARTH / (R_EARTH + altitudeKm));
+    return R_EARTH * beta * 1000;
+}
+
 function createVisuals(sat) {
     const isSuncatcher = Boolean(sat.isSuncatcher);
 
@@ -70,7 +81,7 @@ function createVisuals(sat) {
             title: sat.name,
             label: {
                 text: sat.name,
-                color: isSuncatcher ? "#FFD700" : "#FFFFFF",
+                color: "#FFFFFF",
                 fontSize: "12px",
                 fontWeight: "bold",
                 className: "satellite-label"
@@ -79,21 +90,34 @@ function createVisuals(sat) {
         });
     }
 
-    if (!isSuncatcher && sat.cones.length === 0) {
-        const colors = ['#00FF00', '#FFFF00', '#FF0000'];
-        const opacities = [0.2, 0.15, 0.1];
-
-        for (let i = 0; i < 3; i++) {
-            const cone = new google.maps.Circle({
+    if (sat.cones.length === 0) {
+        if (isSuncatcher) {
+            const visibilityCone = new google.maps.Circle({
                 map: map,
-                fillColor: colors[i],
-                fillOpacity: opacities[i],
-                strokeColor: colors[i],
+                fillColor: '#FFA500',
+                fillOpacity: 0.12,
+                strokeColor: '#FFD700',
                 strokeOpacity: 0.8,
                 strokeWeight: 1,
                 clickable: false
             });
-            sat.cones.push(cone);
+            sat.cones.push(visibilityCone);
+        } else {
+            const colors = ['#00FF00', '#FFFF00', '#FF0000'];
+            const opacities = [0.2, 0.15, 0.1];
+
+            for (let i = 0; i < 3; i++) {
+                const cone = new google.maps.Circle({
+                    map: map,
+                    fillColor: colors[i],
+                    fillOpacity: opacities[i],
+                    strokeColor: colors[i],
+                    strokeOpacity: 0.8,
+                    strokeWeight: 1,
+                    clickable: false
+                });
+                sat.cones.push(cone);
+            }
         }
     }
 
@@ -174,12 +198,20 @@ function updatePositions() {
         }
 
         // Update Cones (uses altitude from same propagation)
-        const offNadirAngles = [10, 20, 30];
-        sat.cones.forEach((cone, index) => {
-            const radius = calculateFootprintRadius(pos.altitudeKm, offNadirAngles[index]);
-            cone.setCenter({ lat: pos.lat, lng: pos.lng });
-            cone.setRadius(radius);
-        });
+        if (sat.isSuncatcher) {
+            const radius = calculateVisibilityRadius(pos.altitudeKm);
+            sat.cones.forEach(cone => {
+                cone.setCenter({ lat: pos.lat, lng: pos.lng });
+                cone.setRadius(radius);
+            });
+        } else {
+            const offNadirAngles = [10, 20, 30];
+            sat.cones.forEach((cone, index) => {
+                const radius = calculateFootprintRadius(pos.altitudeKm, offNadirAngles[index]);
+                cone.setCenter({ lat: pos.lat, lng: pos.lng });
+                cone.setRadius(radius);
+            });
+        }
 
         // Update Tracks (throttled to every 10 seconds or when forced)
         if (shouldUpdateTracks || sat.needsTrackUpdate) {
