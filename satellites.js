@@ -15,7 +15,8 @@ async function fetchTLEs() {
         const data = await response.json();
 
         satellites = data.map(item => {
-            const isDefault = item.name.includes("PLEIADES NEO");
+            const isSuncatcher = item.catNr === 100902 || item.name.toUpperCase().includes("SUNCATCHER");
+            const isDefault = item.name.includes("PLEIADES NEO") || isSuncatcher;
 
             return {
                 name: item.name,
@@ -23,6 +24,7 @@ async function fetchTLEs() {
                 line1: item.line1,
                 line2: item.line2,
                 enabled: isDefault,
+                isSuncatcher: isSuncatcher,
                 satrec: satellite.twoline2satrec(item.line1, item.line2),
                 marker: null,
                 pastPath: null,

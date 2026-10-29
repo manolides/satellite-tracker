@@ -46,3 +46,15 @@ const SATELLITE_SVG = {
     anchor: { x: 0, y: 0 },
     labelOrigin: { x: 0, y: -20 }
 };
+
+// Non-observation satellite icon (Suncatcher)
+const SUNCATCHER_SVG = {
+    path: "M 0,-2.5 L 2.5,0 L 0,2.5 L -2.5,0 Z M -6.5,-1.2 h 3.5 v 2.4 h -3.5 z M 3,-1.2 h 3.5 v 2.4 h -3.5 z",
+    fillColor: "#FFA500",
+    fillOpacity: 1,
+    strokeWeight: 1.5,
+    strokeColor: "#FFD700",
+    scale: 2,
+    anchor: { x: 0, y: 0 },
+    labelOrigin: { x: 0, y: -20 }
+};

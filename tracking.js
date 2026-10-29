@@ -62,22 +62,24 @@ function calculateFootprintRadius(altitudeKm, offNadirDeg) {
 }
 
 function createVisuals(sat) {
+    const isSuncatcher = Boolean(sat.isSuncatcher);
+
     if (!sat.marker) {
         sat.marker = new google.maps.Marker({
             map: map,
             title: sat.name,
             label: {
                 text: sat.name,
-                color: "#FFFFFF",
+                color: isSuncatcher ? "#FFD700" : "#FFFFFF",
                 fontSize: "12px",
                 fontWeight: "bold",
                 className: "satellite-label"
             },
-            icon: SATELLITE_SVG
+            icon: isSuncatcher ? SUNCATCHER_SVG : SATELLITE_SVG
         });
     }
 
-    if (sat.cones.length === 0) {
+    if (!isSuncatcher && sat.cones.length === 0) {
         const colors = ['#00FF00', '#FFFF00', '#FF0000'];
         const opacities = [0.2, 0.15, 0.1];
 
@@ -96,10 +98,11 @@ function createVisuals(sat) {
     }
 
     if (!sat.pastPath) {
+        const pastColor = isSuncatcher ? '#FF8C00' : '#FFFF00';
         sat.pastPath = new google.maps.Polyline({
             map: map,
             geodesic: true,
-            strokeColor: '#FFFF00',
+            strokeColor: pastColor,
             strokeOpacity: 0,
             icons: [{
                 icon: {
@@ -107,7 +110,7 @@ function createVisuals(sat) {
                     strokeOpacity: 1,
                     scale: 3,
                     strokeWeight: 1,
-                    strokeColor: '#FFFF00'
+                    strokeColor: pastColor
                 },
                 offset: '0',
                 repeat: '15px'
@@ -116,12 +119,13 @@ function createVisuals(sat) {
     }
 
     if (!sat.futurePath) {
+        const futureColor = isSuncatcher ? '#FFD700' : '#00FF00';
         sat.futurePath = new google.maps.Polyline({
             map: map,
             geodesic: true,
-            strokeColor: '#00FF00',
+            strokeColor: futureColor,
             strokeOpacity: 1.0,
-            strokeWeight: 1
+            strokeWeight: isSuncatcher ? 1.5 : 1
         });
     }
 }
