@@ -128,45 +128,39 @@ def fetch_tles():
     ctx.verify_mode = ssl.CERT_NONE
 
     for sat_id in SATELLITE_IDS:
-        # Fetch TLE format (text)
-        url = f"{BASE_URL}?CATNR={sat_id}&FORMAT=TLE"
-        print(f"Fetching TLE for {sat_id} from {url}...")
-        
         try:
-            with urllib.request.urlopen(url, context=ctx) as response:
-                if response.status != 200:
-                    print(f"Error fetching {sat_id}: Status {response.status}")
-                    continue
+            if int(sat_id) < 100000:
+                # Fetch TLE format (text) for 5-digit NORAD IDs
+                url = f"{BASE_URL}?CATNR={sat_id}&FORMAT=TLE"
+                print(f"Fetching TLE for {sat_id} from {url}...")
+                with urllib.request.urlopen(url, context=ctx) as response:
+                    data = response.read().decode('utf-8')
+                    lines = [line.strip() for line in data.split('\n') if line.strip()]
+                    if len(lines) >= 3:
+                        all_satellites.append({
+                            "name": NAME_OVERRIDES.get(sat_id, lines[0]),
+                            "line1": lines[1],
+                            "line2": lines[2],
+                            "catNr": int(sat_id)
+                        })
+                        continue
 
-                data = response.read().decode('utf-8')
-                lines = [line.strip() for line in data.split('\n') if line.strip()]
-                
-                if len(lines) >= 3:
-                    # Standard TLE has 3 lines: Name, Line 1, Line 2
-                    sat_data = {
-                        "name": NAME_OVERRIDES.get(sat_id, lines[0]),
-                        "line1": lines[1],
-                        "line2": lines[2],
+            # Use JSON format (required by CelesTrak for 6-digit NORAD IDs >= 100000, where FORMAT=TLE returns HTTP 404)
+            json_url = f"{BASE_URL}?CATNR={sat_id}&FORMAT=json"
+            print(f"Fetching JSON GP for {sat_id} from {json_url}...")
+            with urllib.request.urlopen(json_url, context=ctx) as json_resp:
+                omm_list = json.loads(json_resp.read().decode('utf-8'))
+                if isinstance(omm_list, list) and len(omm_list) > 0:
+                    name, line1, line2 = omm_to_tle(omm_list[0])
+                    all_satellites.append({
+                        "name": NAME_OVERRIDES.get(sat_id, name),
+                        "line1": line1,
+                        "line2": line2,
                         "catNr": int(sat_id)
-                    }
-                    all_satellites.append(sat_data)
+                    })
                 else:
-                    # Fallback to JSON format (required by CelesTrak for 6-digit NORAD IDs >= 100000)
-                    json_url = f"{BASE_URL}?CATNR={sat_id}&FORMAT=json"
-                    print(f"Fetching JSON GP for {sat_id} from {json_url}...")
-                    with urllib.request.urlopen(json_url, context=ctx) as json_resp:
-                        omm_list = json.loads(json_resp.read().decode('utf-8'))
-                        if isinstance(omm_list, list) and len(omm_list) > 0:
-                            name, line1, line2 = omm_to_tle(omm_list[0])
-                            all_satellites.append({
-                                "name": NAME_OVERRIDES.get(sat_id, name),
-                                "line1": line1,
-                                "line2": line2,
-                                "catNr": int(sat_id)
-                            })
-                        else:
-                            print(f"Error: Invalid TLE/GP data for {sat_id}")
-                
+                    print(f"Error: Invalid TLE/GP data for {sat_id}")
+
         except Exception as e:
             print(f"Error fetching {sat_id}: {e}")
 
